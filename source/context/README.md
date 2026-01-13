@@ -279,7 +279,7 @@ sphinx_loongsonlab_theme
     └───pdf            # pdf生成路径
 ```
 
-
+(live-span-target)=
 ## Live Preview 实时在线预览
 
 如果你想在编辑文档时实时查看更改后的html，不必每次都重新make html，然后打开html，可以使用如下命令：

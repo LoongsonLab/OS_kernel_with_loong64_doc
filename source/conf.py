@@ -46,6 +46,14 @@ html_show_sphinx = False
 # 在html下方显示'最后更新于'的时间格式，如注释掉则不显示
 html_last_updated_fmt = '%x %X'
 
+myst_enable_extensions = [
+    "attrs_block",
+    "attrs_inline",
+]
+
+# 将全部警告不现在编译时显示
+# suppress_warnings = ["myst.xref_missing"]
+
 # 扩展插件，必填
 extensions = ['sphinx_loongsonlab_theme']
 
