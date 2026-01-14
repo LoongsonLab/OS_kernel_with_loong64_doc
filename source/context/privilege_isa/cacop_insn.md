@@ -29,4 +29,41 @@
 `code[4:3]` = 3 是自定义缓存操作的一种实现方式，并未在架构规范中明确给出其功能定义。
 
 
-在`Linux 6.10`中，
+在`Linux 6.10`中，`Cacop`指令常用于内核清空`Cache`操作。
+
+在`arch/loongarch/include/asm/cacheflush.h`中，通过内联汇编语法，为`Cacop`创建函数并调用。
+
+``` C
+#define cache_op(op, addr)						\
+	__asm__ __volatile__(						\
+	"	cacop	%0, %1					\n"	\
+	:								\
+	: "i" (op), "ZC" (*(unsigned char *)(addr)))
+
+
+static inline void flush_cache_line(int leaf, unsigned long addr)
+{
+	switch (leaf) {
+	case Cache_LEAF0:
+		cache_op(Index_Writeback_Inv_LEAF0, addr);
+		break;
+	case Cache_LEAF1:
+		cache_op(Index_Writeback_Inv_LEAF1, addr);
+		break;
+	case Cache_LEAF2:
+		cache_op(Index_Writeback_Inv_LEAF2, addr);
+		break;
+	case Cache_LEAF3:
+		cache_op(Index_Writeback_Inv_LEAF3, addr);
+		break;
+	case Cache_LEAF4:
+		cache_op(Index_Writeback_Inv_LEAF4, addr);
+		break;
+	case Cache_LEAF5:
+		cache_op(Index_Writeback_Inv_LEAF5, addr);
+		break;
+	default:
+		break;
+	}
+}
+```
