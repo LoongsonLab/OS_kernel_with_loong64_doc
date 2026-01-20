@@ -1,8 +1,10 @@
 # CACOP指令
 
-指令格式: `cacop code,rj,si12`
+格式: `cacop code,rj,si12`
 
-`CACOP`指令主要用于`Cache`的初始化以及`Cache`一致性维护。
+操作:
+
+CACOP 指令主要用于 Cache 的初始化以及 Cache 一致性维护。
 
 通用寄存器`rj`的值加上符号扩展后的12位立即数`si12`，将得到`CACOP`指令所用的虚拟地址`VA`，其将用于指示被操作`Cache`行的位置。
 
