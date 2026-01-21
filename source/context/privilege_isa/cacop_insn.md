@@ -1,4 +1,4 @@
-# CACOP指令
+# CACOP 指令
 
 格式: `cacop code,rj,si12`
 
@@ -29,7 +29,6 @@ CACOP 指令主要用于 Cache 的初始化以及 Cache 一致性维护。
 由于此查询过程可能涉及虚实地址的转换，因此在这种情况下，`CACOP`指令可能会触发与 `TLB`相关的异常。不过，由于`CACOP`指令是对`Cache`行进行操作，所以在此情况下无需考虑地址是否对齐。
 
 `code[4:3]` = 3 是自定义缓存操作的一种实现方式，并未在架构规范中明确给出其功能定义。
-
 
 在`Linux 6.10`中，`Cacop`指令常用于内核清空`Cache`操作。
 
@@ -69,3 +68,5 @@ static inline void flush_cache_line(int leaf, unsigned long addr)
 	}
 }
 ```
+
+# CPUCFG 指令
