@@ -233,6 +233,137 @@ loongarch64-unknown-linux-gnu-gcc --version
 
 ## AOSC(安同)
 
+1. 在终端中运行该指令下载安同os镜像:
+
+```bash
+$ wget https://releases.aosc.io/os-loongarch64/installer/aosc-os_installer_20251206_loongarch64.iso
+```
+
+2. 创建映像文件
+
+在虚拟机终端中运行如下命令，建立一个 20GiB 大小的硬盘映像文件 aosc.img 供qemu挂载使用   
+```bash
+$ sudo qemu-img create -f raw aosc.img 20G
+```
+
+3. 为映像文件建立分区
+
+随后为 aosc.img 建立分区
+```bash  
+$ sudo fdisk aosc.img
+
+Welcome to fdisk (util-linux 2.37.2).   
+Changes will remain in memory only, until you decide to write them.   
+Be careful before using the write command.   
+   
+Device does not contain a recognized partition table.   
+Created a new DOS disklabel with disk identifier 0x0f513192.
+
+Command (m for help): n   
+Partition type   
+   p   primary (0 primary, 0 extended, 4 free)   
+   e   extended (container for logical partitions)   
+Select (default p): p   
+Partition number (1-4, default 1): 1   
+First sector (2048-41943039, default 2048):    
+Last sector, +/-sectors or +/-size{K,M,G,T,P} (2048-41943039, default 41943039): 
+   
+Created a new partition 1 of type 'Linux' and of size 20 GiB.
+   
+Command (m for help): w   
+The partition table has been altered.   
+Syncing disks.
+```   
+打印目前的分区表   
+```bash  
+$ fdisk -l aosc.img
+
+Disk aosc.img: 20 GiB, 21474836480 bytes, 41943040 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0xe25655f6
+
+Device     Boot Start      End  Sectors Size Id Type
+aosc.img1        2048 41943039 41940992  20G 83 Linux
+```   
+4. 创建Makefile文件
+
+创建一个Makefile文件   
+`$ vim Makefile`   
+在其中编写   
+```makefile
+QEMU  = /your/qemu/path/qemu-system-loongarch64
+MEM   = 4G
+CORES = 4
+CPU   = la464
+MACH  = virt
+BIOS  = /your/EFI.fd/path/QEMU_EFI.fd
+
+DISK  = aosc.img
+# ISO名字可能会随着版本变化而改变，更改为最新下载版本的名字即可
+ISO   = aosc-os_installer_20251206_loongarch64.iso
+
+.PHONY: run run-hd create clean
+
+run:
+        $(QEMU) -m $(MEM) -smp $(CORES) -cpu $(CPU) -machine $(MACH) -bios $(BIOS) \
+                -serial stdio -device virtio-gpu-pci -net nic -net user \
+                -device virtio-blk-pci,drive=drive-virtio-disk0 \
+                -drive id=drive-virtio-disk0,if=none,format=raw,file=$(DISK) \
+                -device virtio-scsi-pci,id=scsi0 \
+                -drive id=drive-scsi0-cdrom0,if=none,format=raw,readonly=on,file=$(ISO) \
+                -device scsi-cd,bus=scsi0.0,drive=drive-scsi0-cdrom0
+
+run-hd:
+        $(QEMU) -m $(MEM) -smp $(CORES) -cpu $(CPU) -machine $(MACH) -bios $(BIOS) \
+                -serial stdio -device virtio-gpu-pci -net nic -net user \
+                -drive file=$(DISK),format=raw,if=virtio
+
+create:
+        qemu-img create -f raw $(DISK) 20G
+
+clean:
+        rm -f $(DISK)
+```   
+5. 使用qemu运行安同os   
+此时文件夹下有三个文件，分别是：  
+```
+aosc.img      
+aosc-os_installer_20251206_loongarch64.iso   
+Makefile
+```   
+使用`sudo make run`命令运行   
+屏幕上会弹出安同os的界面  
+如果无法在安同os界面操作，那就返回到终端中进行操作选择  
+
+```{image} ../../_static/aosc_language.png
+:alt: aosc 选择配置界面
+:class: bg-primary
+:scale: 50 %
+:align: center
+```
+
+第一个界面选择 中文（简体）  
+
+```{image} ../../_static/aosc_grub.png
+:alt: aosc 选择启动项界面
+:class: bg-primary
+:scale: 50 %
+:align: center
+```
+
+第二个界面选择 试用AOSC OS桌面版   
+稍等片刻即可进入安同os桌面  
+
+```{image} ../../_static/aosc_desktop.png
+:alt: aosc 桌面版图片
+:class: bg-primary
+:scale: 50 %
+:align: center
+```
+
 ## Linux kernel
 
 linux内核版本推荐6.10。

@@ -20,7 +20,7 @@ subtitle = u'LoongArch与操作系统底层的交互'
 author = u'龙芯实验室'
 
 # 版权信息，默认为 '2022-2024, 奕行智能科技有限公司'，根据中英文自动切换
-copyright = u'2022-2024, 龙芯中科技术有限公司'
+copyright = u'2022-2026, 龙芯中科技术有限公司'
 
 # 标记文档状态为Draft还是Release，默认Release，状态显示在PDF封面右下角以及内容页右下角，word需要手动填写
 draft_or_release = u'Release'
