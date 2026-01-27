@@ -2,8 +2,13 @@
 调试方法与技巧
 ================
 
-This guide will explain how to get started with NuttX. The following sections will go through each
-required step:
+本章介绍了 LoongArch 生态下，一些常用的测试平台和调试技巧，包含以下内容:
+
+* 调试环境搭建。介绍了 LoongArch 架构下搭建简单调试平台的教程
+* 交叉编译调试平台搭建。介绍了如何在 x86 生态下编译调试 LoongArch 架构操作系统的相关教程
+* 调试工具使用。介绍了 LoongArch 架构调试过程中，gdb 调试工具的常见命令，以及示例教程
+
+本章结合实际的示例，详细说明了如何搭建基本的调试环境，以及如何使用对应命令调试相应信息。
 
 .. toctree::
   :maxdepth: 1

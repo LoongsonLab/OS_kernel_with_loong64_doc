@@ -231,6 +231,24 @@ loongarch64-unknown-linux-gnu-gcc --version
 
 ## Deepin
 
+1. 下载 Deepin 安装镜像，可使用以下命令:
+``` shell
+wget https://mirrors.hust.edu.cn/deepin-cd/25.0.10/loong64/deepin-desktop-community-25.0.10-loong64.iso
+```
+2. 创建虚拟机磁盘。
+
+首先创建一个 100GB 大小的磁盘，可使用以下命令:
+``` shell
+/emulator/qemu/bin/qemu-img create -f qcow2 ./deepin-v23.qcow2 100G
+```
+运行一下命令，启动系统:
+``` shell
+~/emulator/qemu/bin/qemu-system-loongarch64 -m 8G -cpu la464-loongarch-cpu -machine virt -smp 4 -bios ../QEMU_EFI.fd -serial stdio -device virtio-gpu-pci -net nic -device virtio-blk-pci,drive=drive-virtio-disk0 -drive id=drive-virtio-disk0,if=none,format=raw,file=deepin-v23.qcow2 -device virtio-scsi-pci,id=scsi0 -drive id=drive-scsi0-cdrom0,if=none,format=raw,readonly=on,file=deepin-desktop-community-25.0.10-loong64.iso -device scsi-cd,bus=scsi0.0,drive=drive-scsi0-cdrom0
+```
+``` shell
+
+```
+
 ## AOSC(安同)
 
 1. 在终端中运行该指令下载安同os镜像:
@@ -465,10 +483,3 @@ make ARCH=loongarch CROSS_COMPILE=loongarch64-linux-gnu- -j$(nproc)
 ## 如何自己上手编译一个发行版
    以“勇豹”(Yongbao)为例：https://github.com/sunhaiyong1978/Yongbao.git
 
-
-
-
-
-
-
-   

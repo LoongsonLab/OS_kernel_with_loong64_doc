@@ -90,3 +90,7 @@
 4、手册与文档地址。
 
 -	[龙芯架构参考手册卷一](https://www.loongson.cn/uploads/images/2023041918133323805.%E9%BE%99%E8%8A%AF%E6%9E%B6%E6%9E%84%E5%8F%82%E8%80%83%E6%89%8B%E5%86%8C%E5%8D%B7%E4%B8%80_r1p03.pdf):基础指令参考手册
+
+- [Qemu 官方文档](https://www.qemu.org/docs/master/)
+
+- [GDB 官方文档](https://www.gnu.org/software/gdb/documentation/)
