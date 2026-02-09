@@ -69,7 +69,7 @@ def override_html_config(app: Sphinx, config: Config) -> None:
         config['html_logo'] = os.path.join(theme_path, 'static', 'logo.svg')
 
     if not config['html_favicon']:
-        config['html_favicon'] = os.path.join(theme_path, 'static', 'favicon.ico')
+        config['html_favicon'] = os.path.join(theme_path, 'static', 'favicon.jpg')
 
     if not config['html_theme_options']:
         config['html_theme_options'] = {

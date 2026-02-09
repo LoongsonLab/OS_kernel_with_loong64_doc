@@ -2,8 +2,7 @@
 FAQ
 =========
 
-This guide will explain how to get started with NuttX. The following sections will go through each
-required step:
+本章节主要收集往年遇到的LoongArch相关的问题，可参考相关的回答！
 
 .. toctree::
   :maxdepth: 1

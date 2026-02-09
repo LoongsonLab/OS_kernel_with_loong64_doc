@@ -18,5 +18,3 @@
    context/simd/index.rst
    context/virt/index.rst
    context/faq/index.rst
-   context/README
-   context/myst_markdown

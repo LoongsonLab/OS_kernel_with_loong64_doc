@@ -2,8 +2,7 @@
 程序二进制接口
 ================
 
-This guide will explain how to get started with NuttX. The following sections will go through each
-required step:
+本章节主要描述有关LoongArch的程序二进制接口（Application Binary Interface）。本章待补充！
 
 .. toctree::
   :maxdepth: 1

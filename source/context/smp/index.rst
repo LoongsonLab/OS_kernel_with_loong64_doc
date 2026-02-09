@@ -2,8 +2,7 @@
 SMP多核系统
 ============
 
-This guide will explain how to get started with NuttX. The following sections will go through each
-required step:
+本章节设计LoongArch的SMP，多核系统的内容。本章待补充！
 
 .. toctree::
   :maxdepth: 1

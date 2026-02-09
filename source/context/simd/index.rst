@@ -2,8 +2,7 @@
 高级应用：SMID与向量指令
 ========================
 
-This guide will explain how to get started with NuttX. The following sections will go through each
-required step:
+本章节主要涉及LoongArch相关的向量指令内容。本章待补充！
 
 .. toctree::
   :maxdepth: 1
