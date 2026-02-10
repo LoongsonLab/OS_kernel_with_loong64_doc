@@ -7,13 +7,11 @@ build:
 
 python:
   install:
-    #- requirements: sphinx_loongsonlab_theme/templates/requirements.txt
     - requirements: requirements.txt
     - method: pip
       path: .
 
 sphinx:
-  #configuration: sphinx_loongsonlab_theme/templates/source/conf.py
   configuration: source/conf.py
 
 formats:
