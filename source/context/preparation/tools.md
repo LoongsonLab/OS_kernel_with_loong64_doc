@@ -244,15 +244,15 @@ wget https://raw.githubusercontent.com/Open-ChipHub/LoongArch-SDK/refs/heads/mai
 ```shell
 wget https://github.com/loongson/build-tools/releases/download/2023.08.08/x86_64-cross-tools-loongarch64-gcc-libc.tar.xz
 tar xvf ./x86_64-cross-tools-loongarch64-gcc-libc.tar.xz
-// set env
+#  set env
 export CROSS_COMPILE=loongarch64-unknown-linux-gnu-
-// replace your real path of cross compiler with {/path/of/cross/compile}
+#  replace your real path of cross compiler with {/path/of/cross/compile}
 export PATH={/path/of/cross/compile}/bin:$PATH
 ```
 使用以下命令检查软件安装情况:
 ``` shell
 loongarch64-unknown-linux-gnu-gcc --version
-// print version on terminal.
+#  print version on terminal.
 ```
 2. 下载仓库并初始化
 ``` shell

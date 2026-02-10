@@ -14,7 +14,405 @@ LoongArch 架构下，指令系统的功能特性的实现情况，都记录在�
 
 配置信息字有独立的编号空间，一个配置信息字为 32 比特，每个配置信息字又包含一系列配置位，即多比特组成一个域，表达特定含义。
 
-GPUCFG 可访问的配置信息列表，可以在手册《龙芯架构参考手册卷一》2.2.10.5 章节中查看。
+GPUCFG 可访问的配置信息列表，如下所示。
+
+1. 字号 0x0 的配置字，信息如下:
+
+:::{list-table} 字号 0x0 配置字信息列表
+:widths: 10 10 30
+:header-rows: 1
+
+*	- **位下标**
+	- **助记名称**
+	- **含义**
+*	- 31：0
+	- PRID
+	- 处理器标识
+:::
+
+2. 字号为 0x1 的配置字，信息如下:
+
+:::{list-table} 字号 0x1 配置字信息列表
+:widths: 10 10 30
+:header-rows: 1
+
+*	- **位下标**
+	- **助记名称**
+	- **含义**
+*	- 1：0
+	- ARCH
+	- 2'b00 表示实现 LA32 精简架构；2'b01 表示实现 LA32 架构；2'b10 表示实现 LA64 架构。2'b11 保留。
+*	- 2
+	- PGMMU
+	- 为 1 表示 MMU 支持页映射模式
+*	- 3
+	- IOCSR
+	- 为 1  表示支持 IOCSR 指令
+*	- 11 : 4
+	- PALEN
+	- 所支持的物理地址位数 PALEN 的值减 1
+*	- 19 : 12
+	- VALEN
+	- 所支持的虚拟地址位数 VALEN 的值减 1
+*	- 20
+	- UAL
+	- 为 1  表示支持非对齐访问
+*	- 21
+	- RI
+	- 为 1  表示支持"读禁止"页属性
+*	- 22
+	- EP
+	- 为 1  表示支持"执行保护"页属性
+*	- 23
+	- RPLV
+	- 为 1  表示支持 RPLV 页属性
+*	- 24
+	- HP
+	- 为 1  表示支持 huge page 页属性
+*	- 25
+	- CRC
+	- 为 1  表示支持 CRC 校验指令
+*	- 26
+	- msg_int
+	- 为 1  表示支持外部中断采用消息中断方式
+:::
+
+3. 字号为 0x2 的配置字，信息如下:
+
+:::{list-table} 字号 0x2 配置字信息列表
+:widths: 10 10 30
+:header-rows: 1
+
+*	- **位下标**
+	- **助记名称**
+	- **含义**
+*	- 0
+	- FP
+	- 为 1 表示支持基础浮点数指令
+*	- 1
+	- FP_SP
+	- 为 1 表示支持单精度浮点数
+*	- 2
+	- FP_DP
+	- 为 1 表示支持双精度浮点数
+*	- 5 : 3
+	- FP_ver
+	- 浮点运算标准的版本号。1 为初始版本号，表示兼容 IEEE 754-2008 标准。
+*	- 6
+	- LSX
+	- 为 1 表示支持 128 位向量扩展
+*	- 7
+	- LASX
+	- 为 1 表示支持 256 位向量扩展
+*	- 8
+	- COMPLEX
+	- 为 1 表示支持复数向量运算指令
+*	- 9
+	- CRYPTO
+	- 为 1 表示支持加解密向量指令
+*	- 10
+	- LVZ
+	- 为 1 表示支持虚拟化扩展
+*	- 13 : 11
+	- LVZ_ver
+	- 虚拟化硬件加速规范的版本号。1 为初始版本号
+*	- 14
+	- LLFTP
+	- 为 1 表示支持恒定频率计时器和定时器
+*	- 17 : 15
+	- LLFTP_ver
+	- 恒定频率计时器和定时器的版本号。1 为初始版本。
+*	- 18
+	- LBT_X86
+	- 为 1 表示支持 X86 二进制翻译扩展
+*	- 19
+	- LBT__ARM
+	- 为 1 表示支持 ARM 二进制翻译扩展
+*	- 20
+	- LBT__MIPS
+	- 为 1 表示支持 MIPS 二进制翻译扩展
+*	- 21
+	- LSPW
+	- 为 1 表示支持软件页表遍历指令
+*	- 22
+	- LAM
+	- 为 1 表示支持 AM* 原子访存指令
+*	- 24
+	- HPTW
+	- 为 1 表示支持硬件页表遍历(Page Table Walker)
+*	- 25
+	- FRECIPE
+	- 为 1 表示支持 FRECIPE.{S/D}、FRSQRTE.{S/D} 这 4 条指令，且如果同时支持了 128 位向量扩展，则支持 VFRECIPE.{S/D}、VFRSQRTE.{S/D} 这 4 条指令，且如果同时支持了 256 位向量扩展，则支持 XVFRECIPE.{S/D}、XVFRSQRTE.{S/D} 这 4 条指令。
+*	- 26
+	- DIV32
+	- 为 1 表示 64 位机器上 DIV.2[U] 和 MOD.W[U] 指令仅根据输入寄存器的低 32 位数据进行计算。
+*	- 27
+	- LAM_BH
+	- 为 1 表示支持 AM{SWAP/ADD}[_DB].{B/H} 这 8 条指令
+*	- 28
+	- LAMCAS
+	- 为 1 表示支持 AMCAS[_DB].{B/H/W/D} 这 8 条指令
+*	- 29
+	- LLACQ_SCREL
+	- 为 1 表示支持 LLACQ.{W/D}、SCREL.{W/D} 这 4 条指令
+*	- 30
+	- SCQ
+	- 为 1 表示支持 SC.Q 指令
+:::
+
+4. 字号为 0x3 的配置字，信息如下:
+
+:::{list-table} 字号 0x3 配置字信息列表
+:widths: 10 10 30
+:header-rows: 1
+
+*	- **位下标**
+	- **助记名称**
+	- **含义**
+*	- 0
+	- CCDMA
+	- 为 1 表示支持硬件 Cache Coherent DMA
+*	- 1
+	- SFB
+	- 为 1 表示支持 Store Fill Buffer (SFB)
+*	- 2
+	- UCACC
+	- 为 1 表示支持 ucacc win
+*	- 3
+	- LLEXC
+	- 为 1 表示支持 LL 指令取独占块功能
+*	- 4
+	- SCDLY
+	- 为 1 表示支持 SC 后随机延迟功能
+*	- 5
+	- LLDBAR
+	- 为 1 表示支持 LL 自动带 dbar 功能
+*	- 6
+	- ITLBHMC
+	- 为 1 表示硬件维护 ITLB 与 TLB 之间的一致性
+*	- 7
+	- ICHMC
+	- 为 1 表示硬件维护同一处理器核内 ICache 与 DCache 的数据一致性
+*	- 10 : 8
+	- SPW_LVL
+	- page walk 指令所支持的最大目录层数
+*	- 11
+	- SPW_HP_HF
+	- 为 1 表示 page walk 指令在遇到大页时将折半填入 TLB
+*	- 12
+	- RVA
+	- 为 1 表示支持软件配置缩短虚拟地址范围的功能
+*	- 16 : 13
+	- RVAMAX - 1
+	- 最大可以配置的虚拟地址缩短位数 - 1
+*	- 17
+	- DBAR_hints
+	- 为 1 表示 DBAR 的非 0 值按照手册推荐含义实现
+*	- 23
+	- LD_SEQ_SA
+	- 为 1 表示硬件已开启保证同地址 load 操作顺序执行的功能
+:::
+
+5. 字号 0x4 的配置字，信息如下:
+
+:::{list-table} 字号 0x4 配置字信息列表
+:widths: 10 10 30
+:header-rows: 1
+
+*	- **位下标**
+	- **助记名称**
+	- **含义**
+*	- 31：0
+	- CC_FREQ
+	- 恒定频率计时器和定时器所用时钟对应的晶振频率
+:::
+
+6. 字号 0x5 的配置字，信息如下:
+
+:::{list-table} 字号 0x5 配置字信息列表
+:widths: 10 10 30
+:header-rows: 1
+
+*	- **位下标**
+	- **助记名称**
+	- **含义**
+*	- 15：0
+	- CC_MUL
+	- 恒定频率计时器和定时器所用时钟对应的倍频因子
+*	- 31：16
+	- CC_DIV
+	- 恒定频率计时器和定时器所用时钟对应的分频系数
+:::
+
+7. 字号 0x6 的配置字，信息如下:
+
+:::{list-table} 字号 0x6 配置字信息列表
+:widths: 10 10 30
+:header-rows: 1
+
+*	- **位下标**
+	- **助记名称**
+	- **含义**
+*	- 0
+	- PMP
+	- 为 1 表示支持性能计数器
+*	- 3 : 1
+	- PMVER
+	- 性能监测器中，架构定义事件的版本号，1为初始版本。
+*	- 7 : 4
+	- PMNUM
+	- 性能监测器个数 - 1
+*	- 13 : 8
+	- PMBITS
+	- 性能监测计数器位宽 - 1
+*	- 14
+	- UPM
+	- 为 1 表示支持用户态读取性能计数器
+:::
+
+8. 字号 0x10 的配置字，信息如下:
+
+:::{list-table} 字号 0x10 配置字信息列表
+:widths: 10 10 30
+:header-rows: 1
+
+*	- **位下标**
+	- **助记名称**
+	- **含义**
+*	- 0
+	- L1 IU_Present
+	- 为 1 表示存在一级指令 Cache 或一级统一 Cache
+*	- 1
+	- L1 IU Unify
+	- 为 1 表示 L1 IU_Present 所示的 Cache 是统一 Cache
+*	- 2
+	- L1 D Present
+	- 为 1 表示存在一级数据 Cache
+*	- 3
+	- L2 IU_Present
+	- 为 1 表示存在二级指令 Cache 或二级统一 Cache
+*	- 4
+	- L2 IU Unify
+	- 为 1 表示 L2 IU_Present 所示的 Cache 是统一 Cache
+*	- 5
+	- L2 IU Private
+	- 为 1 表示 L2 IU_Present 所示的 Cache 是每个核私有的
+*	- 6
+	- L2 IU Inclusive
+	- 为 1 表示 L2 IU_Present 所示的 Cache 对更低层次 (L1) 是包含关系
+*	- 7
+	- L2 D Present
+	- 为 1 表示存在二级数据 Cache
+*	- 8
+	- L2 D Private
+	- 为 1 表示二级数据 Cache 是每个核私有的
+*	- 9
+	- L2 D Inclusive
+	- 为 1 表示二级数据 Cache 对更低层次 (L1) 是包含关系
+*	- 10
+	- L3 IU_Present
+	- 为 1 表示存在三级指令 Cache 或三级统一 Cache
+*	- 11
+	- L3 IU Unify
+	- 为 1 表示 L3 IU_Present 所示的 Cache 是统一 Cache
+*	- 12
+	- L3 IU Private
+	- 为 1 表示 L3 IU_Present 所示的 Cache 是每个核私有的
+*	- 13
+	- L3 IU Inclusive
+	- 为 1 表示 L3 IU_Present 所示的 Cache 对更低层次 (L1 及 L2) 是包含关系
+*	- 14
+	- L3 D Present
+	- 为 1 表示存在三级数据 Cache
+*	- 15
+	- L3 D Private
+	- 为 1 表示三级数据 Cache 是每个核私有的
+*	- 16
+	- L2 D Inclusive
+	- 为 1 表示三级数据 Cache 对更低层次 (L1 及 L2) 是包含关系
+:::
+
+9. 字号 0x11 的配置字，信息如下:
+
+:::{list-table} 字号 0x11 配置字信息列表
+:widths: 10 10 30
+:header-rows: 1
+
+*	- **位下标**
+	- **助记名称**
+	- **含义**
+*	- 15 : 0
+	- Way - 1
+	- 路数 - 1 (配置字 10 中 L1 IU_Present 对应的 Cache)
+*	- 23 : 16
+	- Index - log2
+	- log_2 (每一路 Cache 行数)(配置字 10 中 L1 IU_Present 对应的 Cache)
+*	- 30 : 24
+	- Linesize - log2
+	- log_2 (Cache 行字节数)(配置字 10 中 L1 IU_Present 对应的 Cache)
+:::
+
+10. 字号 0x12 的配置字，信息如下:
+
+:::{list-table} 字号 0x12 配置字信息列表
+:widths: 10 10 30
+:header-rows: 1
+
+*	- **位下标**
+	- **助记名称**
+	- **含义**
+*	- 15 : 0
+	- Way - 1
+	- 路数 - 1 (配置字 10 中 L1 D Present 对应的 Cache)
+*	- 23 : 16
+	- Index - log2
+	- log_2 (每一路 Cache 行数)(配置字 10 中 L1 D Present 对应的 Cache)
+*	- 30 : 24
+	- Linesize - log2
+	- log_2 (Cache 行字节数)(配置字 10 中 L1 D Present 对应的 Cache)
+:::
+
+11. 字号 0x13 的配置字，信息如下:
+
+:::{list-table} 字号 0x13 配置字信息列表
+:widths: 10 10 30
+:header-rows: 1
+
+*	- **位下标**
+	- **助记名称**
+	- **含义**
+*	- 15 : 0
+	- Way - 1
+	- 路数 - 1 (配置字 10 中 L2 IU_Present 对应的 Cache)
+*	- 23 : 16
+	- Index - log2
+	- log_2 (每一路 Cache 行数)(配置字 10 中 L2 IU_Present 对应的 Cache)
+*	- 30 : 24
+	- Linesize - log2
+	- log_2 (Cache 行字节数)(配置字 10 中 L2 IU_Present 对应的 Cache)
+:::
+
+12. 字号 0x14 的配置字，信息如下:
+
+:::{list-table} 字号 0x14 配置字信息列表
+:widths: 10 10 30
+:header-rows: 1
+
+*	- **位下标**
+	- **助记名称**
+	- **含义**
+*	- 15 : 0
+	- Way - 1
+	- 路数 - 1 (配置字 10 中 L3 IU_Present 对应的 Cache)
+*	- 23 : 16
+	- Index - log2
+	- log_2 (每一路 Cache 行数)(配置字 10 中 L3 IU_Present 对应的 Cache)
+*	- 30 : 24
+	- Linesize - log2
+	- log_2 (Cache 行字节数)(配置字 10 中 L3 IU_Present 对应的 Cache)
+:::
+
+也可在手册《龙芯架构参考手册卷一》2.2.10.5 章节中查看。
 
 指令读取基本单位为 32 比特。在 LA64 架构下，需要将读取结果进行符号扩展后，再写入寄存器 rd 。
 
