@@ -1454,7 +1454,7 @@ cpucfg  $t1, $t0
 
 很多情况下，我们需要刷新CPU的TLB缓存。
 
-
+(pagetable_flush_inst)=
 ### 页表刷新的指令
 
 :::{note}

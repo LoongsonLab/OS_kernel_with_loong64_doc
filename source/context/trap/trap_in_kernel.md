@@ -269,7 +269,7 @@ VS配置的大小，具体看Kernel设计的情况。比如，Linux中，将VS=7
 .endm
 ```
 
-```asm
+```
 .section .text
 .balign 4096
 .global exception_entry_base
