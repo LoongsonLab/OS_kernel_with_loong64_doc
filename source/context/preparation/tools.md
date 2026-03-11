@@ -311,26 +311,6 @@ qemu-system-loongarch64 -m 8G -cpu la464 -machine virt -smp 4 \
 :scale: 50 %
 :align: center
 ```
-## UOS
-
-1. 使用以下命令，下载 UOS 系统镜像:
-``` shell
-wget https://cdimage-download.chinauos.com/desktop-professional/1074/uos-desktop-20-professional-1070-loongarch64-202511.iso
-```
-2. 创建虚拟机磁盘。
-``` shell
-qemu-img create -f qcow2 ./uso-20.qcow2 100G
-```
-3. 使用以下命令，启动系统:
-``` shell
-qemu-system-loongarch64 -m 4G -smp 4 -cpu la464 -machine virt -bios ./QEMU_EFI.fd \
-                -serial stdio -device virtio-gpu-pci -net nic -net user \
-                -device virtio-blk-pci,drive=drive-virtio-disk0 \
-                -drive id=drive-virtio-disk0,if=none,format=raw,file=uos-20.qcow2 \
-                -device virtio-scsi-pci,id=scsi0 \
-                -drive id=drive-scsi0-cdrom0,if=none,format=raw,readonly=on,file=uos-desktop-20-professional-1070-loongarch64-202511 \
-                -device scsi-cd,bus=scsi0.0,drive=drive-scsi0-cdrom0
-```
 
 ## Deepin
 
@@ -342,18 +322,68 @@ wget https://mirrors.hust.edu.cn/deepin-cd/25.0.10/loong64/deepin-desktop-commun
 
 首先创建一个 100GB 大小的磁盘，可使用以下命令:
 ``` shell
-/emulator/qemu/bin/qemu-img create -f qcow2 ./deepin-v23.qcow2 100G
+/emulator/qemu/bin/qemu-img create -f qcow2 ./deepin.qcow2 100G
 ```
 运行一下命令，启动系统:
 ``` shell
-~/emulator/qemu/bin/qemu-system-loongarch64 -m 8G -cpu la464-loongarch-cpu -machine virt -smp 4 -bios ../QEMU_EFI.fd \
-            -serial stdio -device virtio-gpu-pci -net nic \
-            -device virtio-blk-pci,drive=drive-virtio-disk0 \
-            -drive id=drive-virtio-disk0,if=none,format=raw,file=deepin-v23.qcow2 \
-            -device virtio-scsi-pci,id=scsi0 \
-            -drive id=drive-scsi0-cdrom0,if=none,format=raw,readonly=on,file=deepin-desktop-community-25.0.10-loong64.iso \
-            -device scsi-cd,bus=scsi0.0,drive=drive-scsi0-cdrom0
+qemu-system-loongarch64 \
+      -m 4G \
+      -cpu la464 \
+      -M virt \
+      -smp 4 \
+      -bios ../uefi/QEMU_EFI_self.fd \
+      -device virtio-gpu-pci \
+      -net nic  \
+      -device nec-usb-xhci,id=xhci,addr=0x1b \
+      -device usb-tablet,id=tablet,bus=xhci.0,port=1 \
+      -device usb-kbd,id=keyboard,bus=xhci.0,port=2 \
+      -drive file=deepin.qcow2,format=qcow2,if=virtio \
+      -cdrom deepin-desktop-community-25.0.10-loong64.iso
 ```
+3. 可在 QEMU 界面看到如下选项。
+
+```{image} ../../img/deepin_grub.png
+:alt: Deepin uefi启动界面
+:class: bg-primary
+:scale: 50 %
+:align: center
+```
+4. 点击回车键，可选择[Try Deepin Desktop 25]，进入系统进行体验。
+```{image} ../../img/deepin_start_1.png
+:alt: Deepin 启动界面
+:class: bg-primary
+:scale: 50 %
+:align: center
+```
+```{image} ../../img/deepin_start_2.png
+:alt: Deepin 启动界面
+:class: bg-primary
+:scale: 50 %
+:align: center
+```
+点击方向键，即可进入主界面。
+```{image} ../../img/deepin_login.png
+:alt: Deepin 登录界面
+:class: bg-primary
+:scale: 50 %
+:align: center
+```
+```{image} ../../img/deepin_home.png
+:alt: Deepin 主界面
+:class: bg-primary
+:scale: 50 %
+:align: center
+```
+请注意，在当前操作下，对系统进行的任何更改，将不会保存。
+
+5. 也可以在QEMU界面中选择[Install Deepin 25]，按照系统指引进行安装即可。
+```{image} ../../img/deepin_install.png
+:alt: Deepin 主界面
+:class: bg-primary
+:scale: 50 %
+:align: center
+```
+安装后，可以系统进行进行更改，所有更改操作都将会保存。
 
 ## AOSC(安同)
 
@@ -573,7 +603,11 @@ make ARCH=loongarch CROSS_COMPILE=loongarch64-linux-gnu- menuconfig
 ```
 在`[General setup]`选项中，选择`[Initial RAM filesystem and RAM disk (initramfs/initrd) support]`。在`[Initramfs source file(s)]`中输入`[rootfs.cpio.gz]`。
 
+![](../../img/kernel_config.png)
+
 返回上一页，在`[Kernel type and options]`选项中，选中`[Enable built-in dtb in kernel]`，在`[Source file for built-in dtb]`中输入`[labcore-sim]`。
+
+![](../../img/kernel_config_2.png)
 
 保存并退出。
 
