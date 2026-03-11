@@ -331,7 +331,7 @@ qemu-system-loongarch64 \
       -cpu la464 \
       -M virt \
       -smp 4 \
-      -bios ../uefi/QEMU_EFI_self.fd \
+      -bios ../uefi/QEMU_EFI.fd \
       -device virtio-gpu-pci \
       -net nic  \
       -device nec-usb-xhci,id=xhci,addr=0x1b \
