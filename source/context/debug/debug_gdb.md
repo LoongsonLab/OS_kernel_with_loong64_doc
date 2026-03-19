@@ -1,6 +1,5 @@
 
-# GDB的使用
-
+# GDB使用
 
 ## 交叉编译环境中的GDB
 
@@ -34,14 +33,27 @@ gdb 内部命令，与原生 LoongArch 上 QEMU 连接 gdb 命令保持一致。
 
 设置断点可使用 break 命令，或使用简写 b 。断点位置由函数名或虚拟地址确定。
 
-可使用以下命令，查询已设置的断点。
+在 gdb 界面，使用以下:
+``` shell
+#	replace _start with all function name which you need
+(gdb)b _start
+#	or input any va 
+(gdb)b *0x9000000000200000
+```
+输入命令，使 QEMU 开始运行 guest :
+``` shell
+(gdb)continue
+```
+当 PC 运行到断点对应函数、或对应地址，QEMU 将暂停运行。
+
+断点的管理。可使用以下命令，查询已设置的断点。
 ``` shell
 (gdb) info breakpoint
 Num     Type           Disp Enb Address            What
 1       breakpoint     keep y   0x900000000020006c in main at kernel/main.c:16
 	breakpoint already hit 1 time
 ```
-可使用以下命令，删除已设置的断点。
+或使用以下命令，删除已设置的断点。
 ``` shell
 (gdb) delete breakpoints 1
 (gdb) info breakpoint     
