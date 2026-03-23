@@ -1,6 +1,6 @@
 # 新旧世界的底层差异
 
-[这部分内容主要来自于“怎么龙了吗”阅读材料](https://areweloongyet.com/docs/old-and-new-worlds)
+[这部分内容主要来自于“咱们龙了吗”阅读材料](https://areweloongyet.com/docs/old-and-new-worlds)
 
 
 这些资料主要面向那些参与 LoongArch 内核研发、发行版集成工作等底层工作的开发者们，

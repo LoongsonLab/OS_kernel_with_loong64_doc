@@ -1,6 +1,6 @@
 # 旧世界 [^old-and-new-worlds]
 
-[这部分内容主要来自于“怎么龙了吗”阅读材料](https://areweloongyet.com/docs/old-and-new-worlds)
+[这部分内容主要来自于“咱们龙了吗”阅读材料](https://areweloongyet.com/docs/old-and-new-worlds)
 
 LoongArch 有两套不兼容的软件体系，习惯上大家把它们叫作「旧世界」和「新世界」。
 龙芯中科的材料中也有ABI1.0、ABI2.0的提法（目前所见的表述均未在 ABI 与数字之间加空格）。
