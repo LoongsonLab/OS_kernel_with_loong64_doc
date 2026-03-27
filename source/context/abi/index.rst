@@ -27,3 +27,4 @@
   elf_header.md
   elf_relocation.md
   elf_code_model.md
+  elf_load.md
