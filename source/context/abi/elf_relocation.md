@@ -158,7 +158,7 @@
   类型定义，重新获得地址。此过程主要是运行过程中处理。
 
 
-
+(reloc_type_dynamic)=
 ## 动态链接（dynamic link）
 
 DSO（Dynamic Shared Object）是Linux/Unix系统中动态链接的共享库文件，以.so为扩展名。   
