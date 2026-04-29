@@ -110,7 +110,7 @@ SECTIONS {
 }
 ```
 6, 创建启动代码 ctr.S 。
-``` assemble
+``` asm
 # crt.S
 .section .text.entry
 .global _start
