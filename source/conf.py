@@ -11,7 +11,7 @@ sys.path.append(str(Path('../').resolve()))
 language = 'zh_CN'
 
 # 主标题和项目名，必填，显示在html左上角，PDF文件名，PDF封面第一行以及内容页左上角，默认为'龙芯实验室项目文档模板'
-project = u'龙芯实验室文档'
+project = u'操作系统如何与LoongArch交互'
 
 # 子标题，显示在PDF封面第二行，不显示子标题则设置为''或注释掉
 subtitle = u'LoongArch与操作系统底层的交互'
@@ -26,10 +26,10 @@ copyright = u'2022-2026, 龙芯中科技术股份有限公司'
 draft_or_release = u'Release'
 
 # release标记，必填，显示在PDF文件的右下角，word需要手动填写
-release = 'V1.0'
+release = 'v1.1.0'
 
 # 版本信息，必填，显示在html的左上角
-version = 'V1.0'
+version = 'v1.1.0'
 
 # 是否显示PDF水印，默认True，不显示则设置为False
 pdf_watermark = False
