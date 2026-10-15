@@ -74,11 +74,18 @@ smp-opts options:
 
 在启动 Linux 时，常见用法为 -serial mon:stdio。该选项表示将 QEMU 的监视器（monitor）和虚拟机串口复用，一起重定位到QEMU进程的标准输入输出(终端)。
 
-6. 调试参数: -s -S
+6. 调试参数: -s、-S 与 `-gdb`
 
-参数选项用于建立 gdb 服务。
+这些参数用于建立 GDB stub 服务。`-s` 是 `-gdb tcp::1234` 的简写；为避免将未经
+认证的调试端口暴露到局域网，日常调试应显式绑定回环地址，而不是依赖 `-s`：
 
-其中，-s 选项会让 QEMU 在 TCP 端口 1234 监听来自 gdb 的传入连接，-S 选项会使 QEMU 在启动后，不立即运行 guest ，而是等待主机 gdb 发起连接。
+```bash
+-S -gdb tcp:127.0.0.1:1234
+```
+
+`-S` 会使 QEMU 在启动后保持 guest CPU 停止，直至 GDB 连接后执行 `continue`/`c`。
+GDB stub 没有认证或加密；不要监听 `0.0.0.0`、不要把该端口做端口转发，也不要连接不可信
+网络中的 stub。远程协作应使用受访问控制的 SSH 隧道，并明确谁可以读写 guest 内存和寄存器。
 
 7. 指定镜像: -kernel
 
@@ -90,7 +97,7 @@ smp-opts options:
 
 ``` bash
 #	replace your real path with {/path/to/qemu}.
-{/path/to/qemu}/bin/qemu-system-loongarch64 -M virt -cpu la464 -m 4G -smp 1 -nographic -kernel ./vmlinux -serial mon:stdio -S -s
+{/path/to/qemu}/bin/qemu-system-loongarch64 -M virt -cpu la464 -m 4G -smp 1 -nographic -kernel ./vmlinux -serial mon:stdio -S -gdb tcp:127.0.0.1:1234 -pidfile qemu.pid
 ```
 
 打开一个新终端，并在终端中运行以下命令:
@@ -101,14 +108,28 @@ gdb ./vmlinux
 
 进入 gdb 程序后，使用以下命令，与 QEMU 进行连接。
 ``` bash
-(gdb)target remote localhost:1234
+(gdb)target remote 127.0.0.1:1234
 ```
 
 :::{note}
-端口 1234 是 QEMU 默认的 gdb 连接端口，特殊情况下，当该端口不可用时，可使用 -gdb tcp::xxxx 来代替 QEMU 启动参数 -s ，其中 xxxx 代表可使用的新端口。
+端口 1234 是 `-s` 的默认 GDB 端口。端口不可用时，可使用
+`-gdb tcp:127.0.0.1:xxxx` 替代 `-s`，其中 `xxxx` 是未占用的本地端口。
 
-同时，在 gdb 启动时候，使用 target remote localhost:xxxx 来与 QEMU 建立连接，同样，xxxx 代表可使用的新端口，并与 QEMU 启动时配置的新端口相同。
+同时，在 GDB 中使用 `target remote 127.0.0.1:xxxx` 连接；端口必须与 QEMU 启动参数一致。
 :::
+
+### 会话结束与清理
+
+建议为每次调试建立独立的工作目录，并使用 `-pidfile qemu.pid` 记录 QEMU PID。结束时先在
+Monitor 输入 `quit`，或向确认无误的 PID 发送 `SIGTERM`；然后确认监听端口、PID 文件和日志
+已清理。GDB 侧先执行 `detach`（如需继续运行 guest）或直接结束远程会话；`quit` GDB 不会自动
+清理独立运行的 QEMU。若 QEMU 因 `-S` 或断点保持停止，须显式 `continue` 或在 Monitor `quit`，
+否则会留下看似“卡住”的调试实例。
+
+```bash
+ss -ltnp '( sport = :1234 )'
+test -f qemu.pid && ps -p "$(cat qemu.pid)" -o pid=,cmd=
+```
 
 ## QEMU 调试教程
 
@@ -139,7 +160,9 @@ gdb ./vmlinux
 
 ### QEMU Monitor
 
-QEMU内部有一个管理控制台，提供了一套命令来动态查询和修改虚拟机状态，而无需重启虚拟机。
+QEMU内部有一个管理控制台，提供了一套命令来动态查询和修改虚拟机状态，而无需重启虚拟机。Monitor
+同样拥有控制 guest 的能力；本章仅使用本地 `stdio`，不要把 HMP/QMP monitor 以未认证 TCP
+服务暴露给网络。
 
 默认情况下，可以通过 Ctrl+Alt+2 组合键在图形界面中切换到Monitor。在无图形界面中，可通过 -monitor stdio 将其重定向到当前终端，也可以与串口复用：-serial mon:stdio，此时可通过特定转义键（如Ctrl+a c）在串口和Monitor之间切换。
 
@@ -151,7 +174,10 @@ QEMU内部有一个管理控制台，提供了一套命令来动态查询和修�
 
 控制类命令，则支持 qemu 的快照功能。
 
-QEMU 的快照功能是将虚拟机在虚拟机在某个时间点上的，磁盘信息、内存信息，进行备份，以便在需要时可以快速恢复到该状态。该功能常用于内核模块编译、修改和测试等场景。
+QEMU 的快照功能是将虚拟机在某个时间点上的磁盘与运行状态保存，以便在需要时恢复。快照适合可重复
+实验，不是备份方案：`savevm`/`loadvm` 的可用性取决于块设备和镜像格式，恢复也会丢弃快照之后的
+guest 状态。只对可丢弃的 qcow2 副本操作，保留原始镜像只读备份；不要在包含敏感数据的镜像上把
+快照或 overlay 交给不受信任的用户。
 
 保存快照时，首先使用以下命令，创建一个 qcow2 格式的磁盘镜像(raw格式不支持快照):
 ``` bash
@@ -163,6 +189,10 @@ QEMU 的快照功能是将虚拟机在虚拟机在某个时间点上的，磁盘
 # replace your real path with {/path/to/qemu}.
 {/path/to/qemu}/bin/qemu-system-loongarch64 -M virt -cpu la464 -m 8G -smp 1 -nographic -kernel ./vmlinux -serial mon:stdio -drive file=save.qcow2,format=qcow2
 ```
+退出 QEMU 前可在 Monitor 使用 `info snapshots` 确认快照名称；不再需要的实验镜像应在确认路径后
+单独删除。若使用 `-snapshot`，写入会进入临时 overlay 并在 QEMU 正常退出时丢弃，它同样不是
+持久快照或崩溃恢复机制。
+
 运行结果如下所示:
 
 ![](../../img/qemu_monitorsavevm.png)
@@ -173,7 +203,8 @@ QEMU 的快照功能是将虚拟机在虚拟机在某个时间点上的，磁盘
 
 ### 日志工具
 
-QEMU 中使用 -d 和 -D 参数配合使用是调试操作系统非常有效的方法，可以记录详细的内部调试信息，帮助开发者分析操作系统的行为、定位问题。
+QEMU 中使用 -d 和 -D 参数配合使用是调试操作系统非常有效的方法，可以记录详细的内部调试信息，帮助开发者分析操作系统的行为、定位问题。日志可能包含 guest 内存内容、地址、命令行或文件路径，
+应视为调试数据，避免上传到公共位置。
 
 -d 参数用于启用调试信息的打印，后面可以跟一个或多个调试信息类型，用逗号分隔。
 
@@ -185,7 +216,9 @@ QEMU 中使用 -d 和 -D 参数配合使用是调试操作系统非常有效的�
 - cpu：记录CPU操作
 - mem：记录内存访问
 
--D 参数用于指定调试日志文件的路径，将调试信息输出到指定文件中，而不是显示在终端上。
+-D 参数用于指定调试日志文件的路径，将调试信息输出到指定文件中，而不是显示在终端上。`in_asm`、
+`exec`、`cpu` 等选项会高速增长日志；将其写入专用目录，限制运行时间并监控剩余磁盘空间。调试结束后
+确认不再需要的日志已按项目的数据保留规则清理。
 
 在编译小型操作系统时，两个参数可配合使用，运行结果如下所示:
 

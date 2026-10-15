@@ -35,13 +35,9 @@ GCC的特点包括：
 - **多语言支持**：通过不同的前端（Frontend）处理不同语言，后端（Backend）生成统一的机器码；  
 - **跨平台性**：支持几乎所有主流操作系统和硬件架构，是嵌入式系统开发的首选编译器。
 
-
-### GCC的最新进展
-截至2025年，GCC的最新版本为**15.1.0**（2025年5月发布），其主要更新包括：  
-- **支持C++23特性**：如模块化标准库（`import std;`），简化了标准库的使用；  
-- **性能优化**：改进了代码生成效率，提升了程序的运行速度；  
-- **新架构支持**：增加了对RISC-V、LoongArch等新兴架构的支持。
-
+:::{tip}
+本文中的交叉工具链构建命令以 **GCC 15.2.0、Binutils 2.45、glibc 2.42、Linux UAPI 6.7 和 GDB 16.3** 为验证基线，记录日期为 **2026-10-15**。这不是“最新版本”声明；GCC 的发布版本和 LoongArch 选项会持续变化。使用其他版本时，应先执行 ``$CC -Q --help=target``、``$CC -v`` 和 ``$CC -dumpmachine``，并重新验证生成 ELF 的 ABI 标记、动态加载器和目标 CPU 兼容性。
+:::
 
 ### GCC的应用场景
 GCC的应用极其广泛，主要包括：  
@@ -80,51 +76,38 @@ System types:
 此时，会生成LoongArch有关的二进制文件，但是工具链是运行在x86上。
 :::
 
-如果没有特殊的说明，后续我们都是以交叉编译环境为例，即工具链运行在X86_64上面，生产的可执行文件是针对LoongArch架构的，
-进行相关的内容介绍。
+如果没有特殊说明，后续示例采用“宿主机运行交叉工具链、目标机运行 LoongArch ELF”的环境；宿主机可以是 x86_64、AArch64 或其他受支持架构，并不限定为 x86_64。
 
-## 常见的类别组合
-我们本节以GCC为例，介绍常用的几种组合。
+## 目标三元组、C 库与 ABI
 
-gcc Target Triplet的格式如下所示[^osdev_gcc]，   
-> Machine-Vendor-OperatingSystem
+三元组描述操作系统和 C 库生态，不能单独完整决定 ABI；还必须检查 ``-mabi``、sysroot、启动对象、库和动态加载器是否属于同一 ABI。
 
-比如Machine对于的是架构，如，X86_64, arm, aarch64, riscv, mips, loongarch64等等
+GNU target triplet 通常写作 ``machine-vendor-os``。例如 ``loongarch64-linux-gnu`` 中，``loongarch64`` 是目标 CPU 架构，vendor 可以省略或写作 ``unknown``，``linux-gnu`` 表示 Linux/GNU 用户态。[^osdev_gcc]
 
-```loongarch64-linux-gnu-gcc```指的是，LoongArch64架构，vender是空（也可以是unknown），OS是Linux，使用的是
-glibc库环境。
+|目标前缀示例|C 库/运行环境|适用说明|
+|-|-|-|
+|``loongarch64-linux-gnu-``|glibc Linux 用户态|常见的通用 Linux 交叉工具链前缀。|
+|``loongarch64-linux-musl-``|musl Linux 用户态|面向 musl 根文件系统；头文件、库和动态加载器必须来自同一 sysroot。|
+|``loongarch64-unknown-elf-``|裸机或嵌入式运行时|通常搭配 newlib 或自建运行时，不包含 Linux 动态加载器。|
+|``loongarch64-unknown-none-``|裸机运行时|是否提供 C 库、启动文件和链接脚本取决于具体工具链发行版。|
 
-[^osdev_gcc]: 具体可参考[Target Triplet](https://wiki.osdev.org/Target_Triplet)
+``loongarch64-linux-gnusf`` 和 ``loongarch64-linux-muslsf`` 曾被部分工具链发行版用作软浮点运行时的**发行包前缀**。它们不是只要在任意 GNU 三元组末尾加 ``sf`` 就自动得到的标准 ABI 选择方式；应以该工具链发行版提供的 sysroot、C 库、动态加载器名称和文档为准。
 
-我们在在使用
+LoongArch LP64 基础 ABI 由 ``-mabi=`` 选择，且会影响对象文件的调用约定和 ELF ABI 标记：
 
-下面我经常使用的组合以及说明：
+|ABI|参数传递与浮点约定|运行时要求|
+|-|-|-|
+|``lp64d``|LP64 数据模型；使用 64 位通用寄存器，双精度浮点 ABI 可使用浮点寄存器传递参数。|需要与 ``lp64d`` 匹配的 C 库、启动文件和动态加载器；这是多数通用 LoongArch64 Linux 环境的常见选择。|
+|``lp64f``|LP64 数据模型；单精度浮点 ABI 使用浮点寄存器传递参数。|需要完整的 ``lp64f`` sysroot；不能与 ``lp64d`` 或 ``lp64s`` 对象/库混合链接。|
+|``lp64s``|LP64 数据模型；浮点参数不通过浮点寄存器传递。|需要完整的 ``lp64s``（常称软浮点）sysroot；仅关闭某个源文件的浮点指令并不会把 ``lp64d`` C 库变成 ``lp64s``。|
 
+软浮点 ABI 的现实可用性取决于发行版和工具链是否同时提供 ``lp64s`` 的 libc、crt 对象、libgcc 和动态加载器；不少通用发行版只提供 ``lp64d`` 用户态。因此，在选用 ``lp64f`` 或 ``lp64s`` 前，先检查工具链支持的 ABI、sysroot 中的库和目标根文件系统，而不是仅凭编译器文件名判断。
 
-:::{list-table} LoongArch GCC Target组合
-:header-rows: 1
+[^osdev_gcc]: 具体可参考[Target Triplet](https://wiki.osdev.org/Target_Triplet)。
 
-*   - **组合（前缀）**
-    - **说明（Description）**
-*   - loongarch64-unknown-elf
-    - 这是最简单的，适用于嵌入式的组合，其中使用的c库大都是newlib等嵌入是!
-*   - loongarch64-unknown-none
-    - 和上面的loongarch64-unknown-elf基本差别不大[^gcc_target_none]!
-*   - loongarch64-linux-gnu
-    - 这是我们常见的组合，OS是Linux，使用的GlibC库，支持生成浮点指令等。 
-*   - loongarch64-linux-gnusf
-    - OS是Linux，使用的GlibC库，不支持生成浮点指令。
-*   - loongarch64-linux-musl
-    - 这也是我们常见的组合，OS是Linux，只不过C库使用的是musl C库，支持生成浮点指令等。 
-*   - loongarch64-linux-muslsf
-    - OS是Linux，C库使用的是musl C库，不支持生成浮点指令等。 
-:::
+### 最小 ABI 检查
 
-[^gcc_target_none]: 目前在LoongArch平台使用较少，后续会增加此类组合。
-
-下面我们简单的使用helloworld来简单的说明交叉编译器的使用，以及初级查看生成的可执行文件。
-
-至于工具链的下载和使用，我们后续章节有更加详细的使用说明，这里只是做一个演示。
+以下示例不会假定动态加载器的固定路径，而是直接检查工具链和生成 ELF。至于工具链构建和 sysroot 准备，请参见后续小节。
 
 ```c
 #include <stdio.h>
@@ -136,105 +119,26 @@ int main(int argc, char const *argv[])
 ```
 
 
-编译成一个使用musl库，禁止使用生成浮点指令，动态的ELF可执行文件，命令如下：
-
 ```bash
-loongarch64-linux-muslsf-gcc main.c -o mainsf.elf
+CC=loongarch64-linux-gnu-gcc
+READELF=loongarch64-linux-gnu-readelf
+
+"$CC" -dumpmachine
+"$CC" --print-sysroot
+"$CC" -Q --help=target | grep -E '^-mabi=|^-march=|^-mstrict-align'
+
+"$CC" -mabi=lp64d hello.c -o hello.lp64d
+"$READELF" -hA -lW hello.lp64d
 ```
 
-我们可以使用file命令查看生成的可执行文件的类型情况：
-
-```bash
-shell> file mainsf.elf
-mainsf.elf: ELF 64-bit LSB executable, LoongArch, version 1 (SYSV), dynamically linked, interpreter /lib/ld-musl-loongarch64-sf.so.1, not stripped
-```
-
-注意此时动态ELF的解释器是```/lib/ld-musl-loongarch64-sf.so.1```
-
-如果我们使用打开浮点指令生成的交叉编译器时：
-
-```bash
-shell> loongarch64-linux-musl-gcc main.c -o main.elf
-shell> file main.elf
-main.elf: ELF 64-bit LSB executable, LoongArch, version 1 (SYSV), dynamically linked, interpreter /lib/ld-musl-loongarch64.so.1, not stripped
-```
-
-注意此时动态ELF的解释器是```/lib/ld-musl-loongarch64.so.1```
-
-
-:::{caution}
-/lib/ld-musl-loongarch64-sf.so.1链接器和/lib/ld-musl-loongarch64.so.1链接器不能混用，一个Linux环境中可以同时存在。
-:::
-
-我们可以使用链接器来判断这个***动态的可执行文件ELF***是否是支持浮点指令的，但是我们还有更加稳妥的更加常用的方式
-使用工具```readelf```
-
-查看禁止生成浮点指令的可执行文件：
-```bash
-shell> loongarch64-linux-musl-readelf mainsf.elf
-
-#显示如下：
-ELF Header:
-  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00 
-  Class:                             ELF64
-  Data:                              2\'s complement, little endian
-  Version:                           1 (current)
-  OS/ABI:                            UNIX - System V
-  ABI Version:                       0
-  Type:                              EXEC (Executable file)
-  Machine:                           LoongArch
-  Version:                           0x1
-  Entry point address:               0x120000540
-  Start of program headers:          64 (bytes into file)
-  Start of section headers:          67672 (bytes into file)
-  Flags:                             0x41, SOFT-FLOAT, OBJ-v1
-  Size of this header:               64 (bytes)
-  Size of program headers:           56 (bytes)
-  Number of program headers:         8
-  Size of section headers:           64 (bytes)
-  Number of section headers:         24
-  Section header string table index: 23
-
-```
-
-查看支持生成浮点指令的可执行文件：
-``` bash 
-shell> loongarch64-linux-musl-readelf main.elf
-#显示如下：
-ELF Header:
-  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00 
-  Class:                             ELF64
-  Data:                              2\'s complement, little endian
-  Version:                           1 (current)
-  OS/ABI:                            UNIX - System V
-  ABI Version:                       0
-  Type:                              EXEC (Executable file)
-  Machine:                           LoongArch
-  Version:                           0x1
-  Entry point address:               0x120000540
-  Start of program headers:          64 (bytes into file)
-  Start of section headers:          67672 (bytes into file)
-  Flags:                             0x43, DOUBLE-FLOAT, OBJ-v1
-  Size of this header:               64 (bytes)
-  Size of program headers:           56 (bytes)
-  Number of program headers:         8
-  Size of section headers:           64 (bytes)
-  Number of section headers:         24
-  Section header string table index: 23
-
-```
-
-上述两者在生成的```Flags:```字段，会显示不同的提示，
-
-- 软浮点（禁止生成浮点指令）Flags： 0x41, SOFT-FLOAT, OBJ-v1
-- 软浮点（支持生成浮点指令）Flags： 0x43, DOUBLE-FLOAT, OBJ-v1
+输出中的 ``Machine`` 应为 LoongArch；ELF header 的 ``Flags``/attributes 应与 ``-mabi`` 一致；若生成的是动态 ELF，程序头中的 ``Requesting program interpreter`` 必须指向目标根文件系统实际提供的加载器。将 ``-mabi=lp64d`` 替换为 ``lp64f`` 或 ``lp64s`` 前，先确认编译、链接和目标机运行均成功。
 
 
 ## 如何编译交叉编译器
 
 本小节会教大家如何从gcc等源码编译我们使用的交叉编译器。
 
-### 如何编译loongarch64-linux-gnu[sf]
+### 如何构建 `loongarch64-linux-gnu` 的 LP64 工具链
 
 配置说明：
 
@@ -261,7 +165,7 @@ ELF Header:
 *   - GLIBC版本： glibc-2.42
     - [https://ftp.gnu.org/gnu/glibc/](https://ftp.gnu.org/gnu/glibc/)
 
-*   - GLIBC版本： gcc-15.2.0
+*   - GCC版本： gcc-15.2.0
     - [https://ftp.gnu.org/gnu/gcc/gcc-15.2.0](https://ftp.gnu.org/gnu/gcc/gcc-15.2.0)
 
 *   - GDB版本： gdb-16.3
@@ -269,163 +173,176 @@ ELF Header:
 
 :::
 
-下面逐一演示工具链的制作过程。   
-首先我们定义几个常用的变量（GCC支持生成浮点指令）, 下面显示的命令规则是在Makefile中：
-```Makefile
-SYSDIR=$(shell pwd)
-CROSS_HOST=$(echo $MACHTYPE | sed "s/$(echo $MACHTYPE | cut -d- -f2)/cross/") #x86_64-cross-linux-gnu
-CROSS_TARGET=loongarch64-linux-gnu #表示我们的目标组合
-MABI=lp64d
-BUILD64=-mabi=lp64d
-CROSS_BUILD_DIR=cross-tools-all-202612 #用于安装交叉编译器的目录在：$(SYSDIR)/$(CROSS_BUILD_DIR)
+下面给出一个 GNU/Linux 交叉工具链的最小、可复现流程。它假定所有源码压缩包已经按上表所列版本解压到同一工作目录；下载后应先核对发布方提供的 SHA256/SIGNATURE。不要把构建目录放在源码树中，也不要通过修改 glibc 源码来绕过版本检查。
+
+下面的命令在 Bash 中执行。`BUILD` 是构建和运行工具链的宿主机三元组，`TARGET` 是生成代码的目标机三元组；二者不能互换。示例默认产生 `lp64d` 工具链，若目标是软浮点 ABI，应将 `TARGET`、GCC 配置和后续 sysroot 成套替换，并单独验证，不能只改变一个 `-mabi` 参数。
+
+```bash
+set -euo pipefail
+
+TOP="$(pwd)"                         # 仅包含已验证的源码包和本次构建产物
+BUILD="$(gcc -dumpmachine)"           # 例如 x86_64-pc-linux-gnu
+TARGET="loongarch64-linux-gnu"
+PREFIX="$TOP/cross-tools-all-202612"
+SYSROOT="$PREFIX/sysroot"
+JOBS="${JOBS:-$(nproc)}"
+
+LINUX_SRC="$TOP/linux-6.7"
+BINUTILS_SRC="$TOP/binutils-2.45"
+GCC_SRC="$TOP/gcc-15.2.0"
+GLIBC_SRC="$TOP/glibc-2.42"
+GDB_SRC="$TOP/gdb-16.3"
+GMP_SRC="$TOP/gmp-6.3.0"
+MPFR_SRC="$TOP/mpfr-4.2.2"
+MPC_SRC="$TOP/mpc-1.3.1"
+HOST_DEPS="$TOP/host-tools"
+
+mkdir -p "$PREFIX" "$SYSROOT/usr/include" "$TOP/build" "$HOST_DEPS"
+export PATH="$PREFIX/bin:$PATH"
 ```
 
-#### linux header的安装
-``` Makefile
-LINUX_DIR := linux-6.7
-linux_header:
-   cd $(LINUX_DIR) && make mrproper
-   cd $(LINUX_DIR) && make ARCH=loongarch INSTALL_HDR_PATH=dest headers_install
-   cd $(LINUX_DIR) && find dest/include -name '.*' -delete
-   cd $(LINUX_DIR) && mkdir -pv ${SYSDIR}/$(CROSS_BUILD_DIR)/sysroot/usr/include
-   cd $(LINUX_DIR) && cp -rv dest/include/* ${SYSDIR}/$(CROSS_BUILD_DIR)/sysroot/usr/include
+`$TOP` 中的版本号必须与实际下载的源码目录一致。每次重建请使用新的、为空的 `$TOP/build/<component>` 目录；若要删除旧构建目录，先用 `pwd` 和 `test -d` 确认目标目录，再由用户显式删除，避免在文档中提供面向源码树的递归删除命令。
+
+#### 1. 构建 GCC 的宿主依赖
+
+GCC 本身在宿主机上运行，需要 GMP、MPFR 和 MPC。以下步骤将它们安装到独立的 `$HOST_DEPS`，随后两个 GCC 阶段均显式使用这一前缀；这比依赖宿主机中不明版本的开发包更容易复现。
+
+```bash
+mkdir "$TOP/build/gmp"
+cd "$TOP/build/gmp"
+"$GMP_SRC/configure" --prefix="$HOST_DEPS" --enable-cxx --disable-static
+make -j"$JOBS"
+make install
+
+mkdir "$TOP/build/mpfr"
+cd "$TOP/build/mpfr"
+"$MPFR_SRC/configure" --prefix="$HOST_DEPS" --disable-static \
+  --with-gmp="$HOST_DEPS"
+make -j"$JOBS"
+make install
+
+mkdir "$TOP/build/mpc"
+cd "$TOP/build/mpc"
+"$MPC_SRC/configure" --prefix="$HOST_DEPS" --disable-static \
+  --with-gmp="$HOST_DEPS" --with-mpfr="$HOST_DEPS"
+make -j"$JOBS"
+make install
 ```
 
-编译完成后会在```cross-tools-all-202612/sysroot/usr/include```安装相关的头文件等
+#### 2. 安装 Linux UAPI 头文件
 
-#### binutils的编译和安装
-``` Makefile
-BINUTILS  := binutils-2.45
-binutils:
-   cd $(BINUTILS) && rm -rf gdb* libdecnumber readline sim
-   cd $(BINUTILS) && rm -rf tools-build && mkdir tools-build
-   cd $(BINUTILS)/tools-build && CC=gcc AR=ar AS=as \
-   ../configure --prefix=${SYSDIR}/$(CROSS_BUILD_DIR) --build=${CROSS_HOST} --host=${CROSS_HOST} \
-                    --target=${CROSS_TARGET} --with-sysroot=${SYSDIR}/$(CROSS_BUILD_DIR)/sysroot --disable-nls \
-                    --disable-static --enable-64-bit-bfd
-   cd $(BINUTILS)/tools-build && make configure-host ${JOBS}
-   cd $(BINUTILS)/tools-build && make ${JOBS}
-   cd $(BINUTILS)/tools-build && make install-strip
-   cd $(BINUTILS)/tools-build && cp -v ../include/libiberty.h ${SYSDIR}/$(CROSS_BUILD_DIR)/sysroot/usr/include
+这一步安装的是面向用户态的 UAPI 头文件，并不编译内核，也不应运行 `make mrproper` 破坏已有的内核配置。
 
+```bash
+make -C "$LINUX_SRC" ARCH=loongarch \
+  INSTALL_HDR_PATH="$SYSROOT/usr" headers_install
+find "$SYSROOT/usr/include" -name '.*' -type f -delete
 ```
 
-#### GMP的编译和安装
-```Makefile
-GMP     := gmp-6.3.0
-gmp:
-   cd $(GMP) && rm -rf build && mkdir -p build
-   cd $(GMP)/build && ../configure --prefix=${SYSDIR}/$(CROSS_BUILD_DIR) --enable-cxx --disable-static
-   cd $(GMP)/build && make ${JOBS}
-   cd $(GMP)/build && make install
+完成后，头文件位于 `$SYSROOT/usr/include`。内核头文件版本必须满足所选 glibc 的最低要求；这个要求由 glibc 发布版本决定，不能通过 `sed` 修改 glibc 的 configure 文件来降低。
+
+#### 3. 构建并安装 Binutils
+
+```bash
+mkdir "$TOP/build/binutils"
+cd "$TOP/build/binutils"
+"$BINUTILS_SRC/configure" \
+  --build="$BUILD" --host="$BUILD" --target="$TARGET" \
+  --prefix="$PREFIX" --with-sysroot="$SYSROOT" \
+  --disable-nls --disable-werror --enable-64-bit-bfd
+make -j"$JOBS"
+make install
 ```
 
-#### MPFR的编译和安装
-```Makefile
-MPFR    := mpfr-4.2.2
-mpfr:
-   cd $(MPFR) && rm -rf build && mkdir -p build
-   cd $(MPFR)/build && ../configure --prefix=${SYSDIR}/$(CROSS_BUILD_DIR) --disable-static --with-gmp=${SYSDIR}/$(CROSS_BUILD_DIR)
-   cd $(MPFR)/build && make ${JOBS}
-   cd $(MPFR)/build && make install
+#### 4. 构建 stage-1 GCC 与 libgcc
+
+第一阶段只需要 C 编译器和 `libgcc`，不能依赖尚未安装的目标 C 库。因此使用 `--without-headers`；同时**不要**传递 `--disable-libgcc`，因为本步骤正是要构建 `all-target-libgcc`。
+
+```bash
+mkdir "$TOP/build/gcc-stage1"
+cd "$TOP/build/gcc-stage1"
+"$GCC_SRC/configure" \
+  --build="$BUILD" --host="$BUILD" --target="$TARGET" \
+  --prefix="$PREFIX" --with-sysroot="$SYSROOT" \
+  --with-gmp="$HOST_DEPS" --with-mpfr="$HOST_DEPS" --with-mpc="$HOST_DEPS" \
+  --with-newlib --without-headers --disable-nls \
+  --enable-languages=c --disable-shared --disable-threads \
+  --disable-libatomic --disable-libgomp --disable-libquadmath \
+  --disable-libsanitizer --disable-libssp --disable-libstdcxx \
+  --disable-multilib --with-abi=lp64d --with-simd=none
+make -j"$JOBS" all-gcc all-target-libgcc
+make install-gcc install-target-libgcc
 ```
 
-#### MPC的编译和安装
-```Makefile
-MPC     := mpc-1.3.1
-mpc:
-   cd $(MPC) && rm -rf build && mkdir -p build
-   cd $(MPC)/build && ../configure --prefix=${SYSDIR}/$(CROSS_BUILD_DIR) --disable-static --with-gmp=${SYSDIR}/$(CROSS_BUILD_DIR)
-   cd $(MPC)/build && make ${JOBS}
-   cd $(MPC)/build && make install
+#### 5. 构建并安装 glibc 到 sysroot
+
+glibc 必须在源码树外构建。`--enable-kernel` 要选择所支持发行版的实际最低 Linux 内核版本；下例保留 `5.15` 仅作示例，修订该值时应同时更新兼容性矩阵和测试环境。
+
+```bash
+mkdir "$TOP/build/glibc"
+cd "$TOP/build/glibc"
+BUILD_CC=gcc \
+CC="$TARGET-gcc --sysroot=$SYSROOT -mabi=lp64d -mstrict-align" \
+AR="$TARGET-ar" RANLIB="$TARGET-ranlib" \
+"$GLIBC_SRC/configure" \
+  --build="$BUILD" --host="$TARGET" --prefix=/usr \
+  --libdir=/usr/lib64 --with-headers="$SYSROOT/usr/include" \
+  --enable-kernel=5.15 --disable-werror
+make -j"$JOBS"
+make install_root="$SYSROOT" install
 ```
 
-#### 简易版GCC的编译和安装
-制作交叉编译器中的GCC，第一次编译交叉工具链的GCC需要采用精简方式进行编译和安装，否则会因为缺少目标系统的C库而导致部分内容编译链接失败
-```Makefile
-GCC       := gcc-15.2.0
-gcc-simp:
-   cd $(GCC) && rm -rf tools-build && mkdir tools-build
-   cd $(GCC)/tools-build && AR=ar LDFLAGS="-Wl,-rpath,${SYSDIR}/$(CROSS_BUILD_DIR)/lib" \
-   ../configure --prefix=${SYSDIR}/$(CROSS_BUILD_DIR) --build=${CROSS_HOST} --host=${CROSS_HOST} \
-      --target=${CROSS_TARGET} --disable-nls \
-      --with-mpfr=${SYSDIR}/$(CROSS_BUILD_DIR) --with-gmp=${SYSDIR}/$(CROSS_BUILD_DIR) \
-      --with-mpc=${SYSDIR}/$(CROSS_BUILD_DIR) \
-      --with-sysroot=${SYSDIR}/$(CROSS_BUILD_DIR)/sysroot \
-      --disable-decimal-float --disable-libgomp --disable-libitm \
-      --disable-libsanitizer --disable-libquadmath --enable-threads=posix \
-      --disable-target-zlib --with-system-zlib --enable-checking=release \
-      --enable-tls --enable-initfini-array --enable-__cxa_atexit \
-      --disable-libgcc \
-      --with-simd=none \
-      --enable-default-pie \
-      --enable-languages=c,c++,fortran,objc,obj-c++,lto
-   cd $(GCC)/tools-build && make all-gcc all-target-libgcc ${JOBS}
-   cd $(GCC)/tools-build && make install-strip-gcc install-strip-target-libgcc
+#### 6. 构建完整 GCC
+
+第二阶段使用已经具备 Linux 头文件和 glibc 的 sysroot。示例只启用 C/C++；Fortran、LTO、sanitizer 等运行库应根据 sysroot 是否满足其依赖单独启用和测试。
+
+```bash
+mkdir "$TOP/build/gcc-final"
+cd "$TOP/build/gcc-final"
+"$GCC_SRC/configure" \
+  --build="$BUILD" --host="$BUILD" --target="$TARGET" \
+  --prefix="$PREFIX" --with-sysroot="$SYSROOT" \
+  --with-gmp="$HOST_DEPS" --with-mpfr="$HOST_DEPS" --with-mpc="$HOST_DEPS" \
+  --enable-languages=c,c++ --enable-threads=posix \
+  --enable-shared --enable-__cxa_atexit --disable-multilib \
+  --disable-libsanitizer --disable-werror \
+  --with-abi=lp64d --with-simd=none
+make -j"$JOBS"
+make install
 ```
 
-#### GlibC的编译和安装
-```Makefile
-GLIBC     := glibc-2.42
-glibc:
-   cd $(GLIBC) && sed -i "s@5.15.0@4.15.0@g" sysdeps/unix/sysv/linux/loongarch/configure{,.ac}
-   cd $(GLIBC) && rm -rf build-64 && mkdir -v build-64
-   cd $(GLIBC)/build-64 && BUILD_CC="gcc" CC="${CROSS_TARGET}-gcc ${BUILD64} -mstrict-align" \
-        CXX="${CROSS_TARGET}-gcc ${BUILD64} -mstrict-align" \
-        AR="${CROSS_TARGET}-ar" RANLIB="${CROSS_TARGET}-ranlib" \
-        ../configure --prefix=/usr --host=${CROSS_TARGET} --build=${CROSS_HOST} \
-                    --libdir=/usr/lib64 --libexecdir=/usr/lib64/glibc \
-                    --with-binutils=${SYSDIR}/$(CROSS_BUILD_DIR)/bin \
-                    --with-headers=${SYSDIR}/$(CROSS_BUILD_DIR)/sysroot/usr/include \
-                    --enable-stack-protector=strong \
-                    --enable-add-ons \
-                    --enable-crypt \
-                    --disable-werror libc_cv_slibdir=/usr/lib64 \
-                    --enable-kernel=4.15
-   cd $(GLIBC)/build-64 && make ${JOBS}
-   cd $(GLIBC)/build-64 && make DESTDIR=${SYSDIR}/$(CROSS_BUILD_DIR)/sysroot install
-   cd $(GLIBC)/build-64 && cp -v ../nscd/nscd.conf ${SYSDIR}/$(CROSS_BUILD_DIR)/sysroot/etc/nscd.conf
-   cd $(GLIBC)/build-64 && mkdir -pv ${SYSDIR}/$(CROSS_BUILD_DIR)/sysroot/var/cache/nscd
-   cd $(GLIBC)/build-64 && install -v -Dm644 ../nscd/nscd.tmpfiles \
-                     ${SYSDIR}/$(CROSS_BUILD_DIR)/sysroot/usr/lib/tmpfiles.d/nscd.conf
-   cd $(GLIBC)/build-64 && install -v -Dm644 ../nscd/nscd.service \
-                        ${SYSDIR}/$(CROSS_BUILD_DIR)/sysroot/usr/lib/systemd/system/nscd.service
+这会覆盖 stage-1 的 GCC 驱动程序；stage-1 和 final GCC 使用不同构建目录，因此其配置和日志可以分别追溯。
+
+#### 7. 可选：构建 GDB
+
+GDB 是宿主机程序，应使用 `--host="$BUILD"`，而 `--target` 仍然指向调试对象的目标架构。安装时不要再使用 `DESTDIR`，否则会把 `$PREFIX` 重复拼接。
+
+```bash
+mkdir "$TOP/build/gdb"
+cd "$TOP/build/gdb"
+"$GDB_SRC/configure" \
+  --build="$BUILD" --host="$BUILD" --target="$TARGET" \
+  --prefix="$PREFIX" --with-sysroot="$SYSROOT" \
+  --disable-werror
+make -j"$JOBS"
+make install
 ```
 
-#### 完整版GCC的编译和安装
-```Makefile
-GCC       := gcc-15.2.0
-gcc:
-   cd $(GCC) && rm -rf tools-build-all && mkdir tools-build-all
-   cd $(GCC)/tools-build-all && AR=ar LDFLAGS="-Wl,-rpath,${SYSDIR}/$(CROSS_BUILD_DIR)/lib" \
-      ../configure --prefix=${SYSDIR}/$(CROSS_BUILD_DIR) --build=${CROSS_HOST} \
-                   --host=${CROSS_HOST} --target=${CROSS_TARGET} \
-                   --with-sysroot=${SYSDIR}/$(CROSS_BUILD_DIR)/sysroot --with-mpfr=${SYSDIR}/$(CROSS_BUILD_DIR) \
-                   --with-gmp=${SYSDIR}/$(CROSS_BUILD_DIR) --with-mpc=${SYSDIR}/$(CROSS_BUILD_DIR) \
-                   --enable-__cxa_atexit --enable-threads=posix --with-system-zlib \
-                   --enable-libstdcxx-time --enable-checking=release \
-                   --disable-libssp \
-                   --with-simd=none \
-                   --enable-default-pie \
-                   --enable-languages=c,c++,fortran,objc,obj-c++,lto
-   cd $(GCC)/tools-build-all && make ${JOBS}
-   cd $(GCC)/tools-build-all && make install-strip
-```
-此时安装的GCC会替换掉我们在上面安装的简易版GCC。
+#### 8. 安装后验证
 
-#### GDB的编译和安装
-```Makefile
-GDB       := gdb-16.3
-gdb:
-   rm -rf $(GDB)/build
-   mkdir -p $(GDB)/build
-   cd $(GDB)/build && ../configure --prefix=${SYSDIR}/$(CROSS_BUILD_DIR) \
-                      --build=${CROSS_HOST} \
-                     --host=${CROSS_HOST} --target=${CROSS_TARGET} \
-                     --with-sysroot=${SYSDIR}/$(CROSS_BUILD_DIR)/sysroot --enable-64-bit-bfd
-   cd $(GDB)/build && make ${JOBS}
-   cd $(GDB)/build && make DESTDIR=${SYSDIR}/${CROSS_BUILD_DIR} install
+验证必须同时确认目标三元组、sysroot、ABI 和生成 ELF 的机器类型；仅看到 GCC 版本号不足以证明工具链正确。
+
+```bash
+"$TARGET-gcc" -dumpmachine
+"$TARGET-gcc" --print-sysroot
+printf 'int main(void) { return 0; }\n' > "$TOP/build/hello.c"
+"$TARGET-gcc" -mabi=lp64d "$TOP/build/hello.c" -o "$TOP/build/hello"
+"$TARGET-readelf" -hA "$TOP/build/hello"
+"$TARGET-readelf" -l "$TOP/build/hello" | grep 'Requesting program interpreter'
+"$TARGET-gdb" --version
 ```
+
+预期 `-dumpmachine` 输出 `loongarch64-linux-gnu`，ELF 头的 `Machine` 为 LoongArch；动态链接程序路径、`e_flags` 和 attributes 则应与所选 glibc、ABI 和 binutils 版本相匹配。将上述输出及各源码包的 SHA256 保存为构建记录，才能在后续排查 ABI 问题时重现环境。
 
 
 #### 特殊说明
@@ -461,7 +378,7 @@ loongarch64-linux-musl-gcc main.c -o main -msimd=lsx -v
 :::
 
 
-### 如何编译loongarch64-linux-musl[sf]
+### 如何构建 `loongarch64-linux-musl` 工具链
 
 基于musl-c库的交叉编译器编译顺序和上述的基本一致，我们为了方便，将其做了封装，可以直接使用编译仓库。
 
@@ -504,16 +421,15 @@ GCC_CONFIG += --enable-languages=c,c++ --enable-checking=release
 
 ```
 
-5. 选择支持浮点还是禁止浮点指令
+5. 选择目标前缀与 ABI
 ```bash
 # 修改配置文件 config.mak
 
-# 1. 如果时禁止浮点使用下面的TARGET 
-TARGET = loongarch64-linux-muslsf
-
-# 2. 如果使用支持生成浮点指令的编译器使用下面的TARGET
+# musl Linux 用户态的目标前缀
 TARGET = loongarch64-linux-musl
 ```
+
+``TARGET`` 用于选择目标系统和 musl 运行时，不应用它代替 ``-mabi``。如果所用的 musl-cross-make 分支明确提供 ``loongarch64-linux-muslsf``，它表示该分支打包的软浮点运行时；只有在该分支同时提供 ``lp64s`` 兼容的 musl、crt 对象、libgcc、动态加载器和 sysroot 时才能使用。构建结束后必须以 ``-Q --help=target``、``--print-sysroot`` 和 ``readelf -hA -lW`` 验证实际 ABI 与加载器，而不能只根据前缀推断。
 
 编译之后，会在output中生成我们需要的交叉编译器，可以在out/bin/测试是否正常
 ```bash
@@ -724,7 +640,7 @@ elf64loongarch:
 ```
 
 
-### PIC与PIE的区别是什么
+### PIC、PIE、静态链接与 sysroot
 
 PIC（Position Independent Code，位置无关代码）和PIE（Position Independent Executable，位置无关可执行文件）是两种与内存地址无关的技术，但它们的应用场景和实现方式存在显著差异。以下是两者的核心区别及技术细节：
 
@@ -745,9 +661,9 @@ PIC（Position Independent Code，位置无关代码）和PIE（Position Indepen
   - 通过**全局偏移表（GOT）**和**过程链接表（PLT）**实现间接寻址，避免使用绝对地址。  
   - 代码段（`.text`）中的函数调用和全局变量访问通过GOT/PLT间接解析。  
 
-- **PIE**  
-  - 在PIC基础上进一步要求**代码段可加载到任意地址**，且必须包含`main`函数。  
-  - 与PIC共享GOT/PLT机制，但链接时需通过`-pie`选项强制生成可执行文件。  
+- **PIE**
+  - 生成适合位置无关可执行文件的代码；程序是否包含 `main` 与 PIE 属性无关。
+  - 与PIC共享GOT/PLT机制，但链接时需通过`-pie`选项强制生成可执行文件。
   - 示例编译命令：  
     ```bash
     gcc -fPIE -pie -o program program.c
@@ -794,7 +710,7 @@ PIC（Position Independent Code，位置无关代码）和PIE（Position Indepen
 |----------------|----------------------------------|----------------------------------|
 | **共享库开发** | 必须使用（如`.so`文件）          | 不适用                           |
 | **可执行文件** | 可选（非必须）                   | 必须启用（对抗漏洞攻击）         |
-| **动态加载**   | 支持（如`dlopen`加载插件）       | 不支持                           |
+| **动态加载**   | 支持（如`dlopen`加载插件）       | PIE 程序同样可以使用动态加载     |
 
 ---
 
@@ -812,12 +728,35 @@ PIC（Position Independent Code，位置无关代码）和PIE（Position Indepen
 | **特性**       | **PIC**                          | **PIE**                          |
 |----------------|----------------------------------|----------------------------------|
 | **核心用途**   | 共享库开发                       | 可执行文件安全加固               |
-| **地址随机化** | 依赖ASLR                         | 强制启用ASLR                     |
+| **地址随机化** | 依赖ASLR                         | 为主程序参与 ASLR 提供条件       |
 | **代码共享**   | 多进程共享                       | 单进程独占                       |
 | **编译选项**   | `-fPIC`                          | `-fPIE -pie`                     |
 | **安全等级**   | 中等（保护库代码）               | 高（保护主程序）                 |
 
-通过合理选择PIC和PIE，开发者可以在性能、安全性和兼容性之间取得平衡。例如，共享库必须使用PIC，而面向安全的关键程序（如浏览器、数据库）应启用PIE以防御内存攻击。
+通过合理选择PIC和PIE，开发者可以在性能、安全性和兼容性之间取得平衡。共享库通常使用 PIC；PIE 使主程序可参与 ASLR，但实际随机化仍取决于目标内核、加载器和运行时配置。
+
+#### 与 ABI、链接方式和 sysroot 一起验证
+
+``-fPIC`` 用于生成共享对象所需的位置无关代码，链接共享库时配合 ``-shared``；``-fPIE -pie`` 用于生成位置无关可执行文件。``-static`` 请求静态链接，最终 ELF 不应有 ``PT_INTERP``，但 sysroot 必须提供匹配 ABI 的静态 libc 和其他依赖库。``--sysroot=DIR`` 只改变编译、链接时的目标头文件和库搜索根目录，不会把文件部署到目标系统。
+
+```bash
+CC=loongarch64-linux-gnu-gcc
+READELF=loongarch64-linux-gnu-readelf
+SYSROOT=/path/to/loongarch64-sysroot
+
+"$CC" --sysroot="$SYSROOT" -mabi=lp64d -fPIC -shared hello.c -o libhello.so
+"$CC" --sysroot="$SYSROOT" -mabi=lp64d -fPIE -pie hello.c -o hello.pie
+"$CC" --sysroot="$SYSROOT" -mabi=lp64d -static hello.c -o hello.static
+"$CC" --sysroot="$SYSROOT" -mabi=lp64d -mstrict-align hello.c -o hello.strict-align
+
+"$READELF" -h -lW hello.pie
+"$READELF" -h -lW hello.static
+"$CC" --sysroot="$SYSROOT" -v -E -x c /dev/null
+```
+
+验证时，``libhello.so`` 应为共享对象，``hello.pie`` 通常为 ``ET_DYN`` 且带有 ``PT_INTERP``，``hello.static`` 不应有 ``Requesting program interpreter``。最后一条命令显示实际的头文件和库搜索路径，可用于确认没有意外使用宿主机文件。
+
+``-mstrict-align`` 要求编译器不生成非对齐内存访问指令，适用于目标核或外设映射不支持非对齐访问的情形。它不改变 ABI，不能修复无效指针、越界访问或错误的结构布局；开启后应在目标硬件上测试性能和功能。
 
 ---
 
@@ -856,6 +795,28 @@ PIC（Position Independent Code，位置无关代码）和PIE（Position Indepen
              数据模型是LP64，指的是int是32位，long int和指针都是64位。
    - lp64s： 使用64位通用寄存器，没有浮点寄存器传递参数，
              数据模型是LP64，指的是int是32位，long int和指针都是64位。
+---
+
+#### `-march` 与 `-mabi` 的兼容规则
+
+* ``-march`` 决定允许生成的 ISA 指令与扩展；选择 ``la64v1.1``、``la464`` 或 ``la664`` 所生成的程序，不能假定能在只支持 LA64 v1.0 或缺少相应扩展的目标 CPU 上运行。
+* ``-mabi`` 决定数据模型和跨对象的调用约定。参与同一次链接的应用对象、静态库、启动对象和 libc 必须使用兼容 ABI；即使 ``-march`` 相同，混用 ``lp64d``、``lp64f``、``lp64s`` 仍是不正确的。
+* 不同对象可以针对不同的、但目标 CPU 均支持的 ``-march`` 编译；发布程序时应以部署 CPU 的最小 ISA 能力为准。不能只因链接成功就认为目标机器能够执行所有指令。
+* ``-mfpu``、``-msoft-float`` 和 ``-msimd`` 控制可生成的指令或扩展，它们不能替代 ``-mabi``。改变 ABI 时必须同时换用对应 sysroot；仅增加或禁止某一类指令时，仍应检查 ABI 是否保持不变。
+
+可通过编译器的实际配置和 ELF 输出验证选择：
+
+```bash
+CC=loongarch64-linux-gnu-gcc
+READELF=loongarch64-linux-gnu-readelf
+
+"$CC" -Q -march=la64v1.0 -mabi=lp64d --help=target
+"$CC" -march=la64v1.0 -mabi=lp64d hello.c -o hello.la64v1.0.lp64d
+"$READELF" -hA hello.la64v1.0.lp64d
+```
+
+若编译器拒绝某个 ``-march/-mabi`` 组合、链接器报告 ABI 不匹配，或目标根文件系统缺少对应加载器/库，应停止并选择工具链实际提供的组合，而不是强行混合对象文件。
+
 ---
 
 -mfpu=fpu-type:

@@ -101,6 +101,19 @@ SIMD (单指令多数据流)与向量指令，是 CPU 为高效处理数据并�
 文档中，对多款硬件平台的架构和组件，进行详细的描述和说明，为操作系统适配提供帮助。
 
 
+## 规范引用基线
+
+为避免同一概念引用不同版本的规范，本文的通用基线如下。平台专有寄存器、地址空间和中断路由仍须以相应芯片用户手册为准；Linux、编译器和 QEMU 的示例版本不能替代这些规范。
+
+|资料|引用版本|发布日期/版本日期|链接|主要适用章节|
+|-|-|-|-|-|
+|龙芯架构参考手册 卷一：基础架构|r1p11|2025-03-21|[PDF](https://loongson.cn/uploads/images/2025032109191292796.%E9%BE%99%E6%9E%B6%E6%9E%84%E5%8F%82%E8%80%83%E6%89%8B%E5%86%8C%E5%8D%B7%E4%B8%80_r1p11.pdf)|特权态指令、内存管理、中断与异常、SMP、汇编基础。|
+|LoongArch ABI|v2.50|2025-12-10|[PDF](https://github.com/loongson/la-abi-specs/releases/download/v2.50/la-abi-v2.50.pdf)|程序二进制接口、ELF、调用约定、数据类型、代码模型。|
+|Linux 内核|v6.10|2024-07-14|[tag](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tag/?h=v6.10)|内核构建、特权态、异常、SMP 和平台示例；不同章节若固定到其他 tag，会在正文中另行说明。|
+|龙芯 CPU 统一系统架构规范（LA 架构嵌入式系列）|V1.1|2025-01-10|[PDF](https://loongson.cn/uploads/images/2025011014243453502.%E9%BE%99%E8%8A%AFCPU%E7%BB%9F%E4%B8%80%E7%B3%BB%E7%BB%9F%E6%9E%84%E8%A7%84%E8%8C%83(LA%E6%9E%B6%E6%9E%84%E5%B5%8C%E5%85%A5%E5%BC%8F%E7%B3%BB%E5%88%97)V1.1.pdf)|嵌入式平台与系统级资源的补充说明。|
+
+更新正文时，引用规范必须同时写明“名称、版本、发布日期/版本日期、链接和适用章节”；若新版本改变了软件可见行为，应同时更新首页的适用范围、相关示例和本表。早于 r1p11 的基础架构手册仅可作为历史背景，不再作为本文的通用依据。
+
 ## 仓库地址
 
 一些常用的仓库地址列出，以及说明:
@@ -127,13 +140,13 @@ SIMD (单指令多数据流)与向量指令，是 CPU 为高效处理数据并�
 
 4、手册与文档地址。
 
--	[龙芯架构参考手册卷一](https://www.loongson.cn/uploads/images/2023041918133323805.%E9%BE%99%E8%8A%AF%E6%9E%B6%E6%9E%84%E5%8F%82%E8%80%83%E6%89%8B%E5%86%8C%E5%8D%B7%E4%B8%80_r1p03.pdf):基础指令参考手册
+-	[龙芯架构参考手册卷一 r1p11](https://loongson.cn/uploads/images/2025032109191292796.%E9%BE%99%E6%9E%B6%E6%9E%84%E5%8F%82%E8%80%83%E6%89%8B%E5%86%8C%E5%8D%B7%E4%B8%80_r1p11.pdf):本文通用基础架构依据；版本、日期及适用范围见上表。
 - 	[Qemu 官方文档](https://www.qemu.org/docs/master/)
 - 	[GDB 官方文档](https://www.gnu.org/software/gdb/documentation/)
 -	[龙芯 2K0300 处理器用户手册 V1.01](https://www.loongson.cn/uploads/images/2025060909243029508.%E9%BE%99%E8%8A%AF2K0300%E5%A4%84%E7%90%86%E5%99%A8%E7%94%A8%E6%88%B7%E6%89%8B%E5%86%8C_V1.01.pdf) : 龙芯 2K0300 处理器用户手册。
 -	[龙芯 2K0500 处理器用户手册 V1.0](https://www.loongson.cn/uploads/images/2023042109171499358.%E9%BE%99%E8%8A%AF2K0500%E5%A4%84%E7%90%86%E5%99%A8%E7%94%A8%E6%88%B7%E6%89%8B%E5%86%8C_v1.0.pdf) : 龙芯 2K0500 处理器用户手册。
 -	[龙芯 2K1000LA 处理器用户手册 V1.0](https://www.loongson.cn/uploads/images/2022090113542571398.%E9%BE%99%E8%8A%AF2K1000LA%E5%A4%84%E7%90%86%E5%99%A8%E7%94%A8%E6%88%B7%E6%89%8B%E5%86%8C.pdf) : 龙芯 2K1000LA 处理器用户手册。
--	[龙芯 3A5000 处理器用户手册 V1.3](https://www.loongson.cn/uploads/images/2022051617120455270.%E9%BE%99%E8%8A%AF3A5000_3B5000%E5%A4%84%E7%90%86%E5%99%A8%E5%AF%84%E5%AD%98%E5%99%A8%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C.pdf) : 龙芯 3A5000 处理器用户手册。
+-	[龙芯 3A5000 处理器用户手册 V1.7](https://www.loongson.cn/uploads/images/2022051617120455270.%E9%BE%99%E8%8A%AF3A5000_3B5000%E5%A4%84%E7%90%86%E5%99%A8%E5%AF%84%E5%AD%98%E5%99%A8%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C.pdf) : 龙芯 3A5000 处理器用户手册。
 -	[龙芯 3A6000 处理器寄存器使用手册 V1.2](https://www.loongson.cn/uploads/images/2024072510054986439.Loongson3A6000%20user%20book_V1.2.pdf) : 龙芯 3A6000 处理器寄存器使用手册。
 -	[龙芯 CPU 统一系统架构规范 V1.1](https://loongson.cn/uploads/images/2025011014243453502.%E9%BE%99%E8%8A%AFCPU%E7%BB%9F%E4%B8%80%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84%E8%A7%84%E8%8C%83(LA%E6%9E%B6%E6%9E%84%E5%B5%8C%E5%85%A5%E5%BC%8F%E7%B3%BB%E5%88%97)V1.1.pdf) : 龙芯 CPU 统一系统架构规范。
 
@@ -151,16 +164,15 @@ SIMD (单指令多数据流)与向量指令，是 CPU 为高效处理数据并�
 	- wangyuji@loongson.cn
 :::
 
-内容报错，与意见反馈，可通过以下方式进行。
-
-- Github 仓库提 Issue。
-- 邮件反馈。
-- 技术交流群。
+内容报错与意见反馈，请优先通过 [GitHub Issues](https://github.com/LoongsonLab/OS_kernel_with_loong64_doc/issues) 提交；Issue 应包含文档路径和行号、问题类型（规范/实现/示例/链接）、所用硬件或模拟器、固件、工具链、内核版本、完整复现命令、实际输出和预期结果。无法公开的信息可发送邮件至上述维护人，并在邮件中说明是否允许维护者引用或公开复现材料。
 
 
 ## 更新说明
 
 按照版本号：主版本号.次版本号.修订版本号，比如 1.1.1020，建议修订版本号以时间为准。
+
+0.1.1115
+- 修改细节，补充内容
 
 0.1.0423
 - 增加 QEMU 裸机运行用户程序教程

@@ -113,10 +113,10 @@
 #define R_LARCH_TLS_GD_HI20 98
 #define R_LARCH_32_PCREL 99
 #define R_LARCH_RELAX 100
-#define R_LARCH_DELETE 101
+/* 101 reserved (R_LARCH_DELETE was removed from the ABI) */
 #define R_LARCH_ALIGN 102
 #define R_LARCH_PCREL20_S2 103
-#define R_LARCH_CFA 104
+/* 104 reserved (R_LARCH_CFA was removed from the ABI) */
 #define R_LARCH_ADD6 105
 #define R_LARCH_SUB6 106
 #define R_LARCH_ADD_ULEB128 107
@@ -322,6 +322,101 @@ Relocation section '.rela.plt' at offset 0x540 contains 3 entries:
 
 在函数被加载后，ld.so会先通过执行``add_resolver``函数来确定到底实行那个add函数。
 
+## `.rela.*`、动态标签与运行时链接
+
+LoongArch ELF 使用带显式 addend 的 `Elf*_Rela` 表项；因此在 Linux 用户态对象中，
+常见的是 `.rela.dyn` 和 `.rela.plt`，而不是把 addend 隐含在被修改位置的 `.rel.*`。
+`.rela.dyn` 通常承载 `R_LARCH_RELATIVE`、数据符号和 TLS 相关修复；`.rela.plt`
+通常承载函数调用的 `R_LARCH_JUMP_SLOT`。这只是常见 GNU 链接布局，具体节名、顺序
+和地址不是 ABI 常量。
+
+动态段使用的是通用 ELF dynamic tags；当前 LoongArch ELF ABI 没有要求应用程序依赖
+额外的 LoongArch 专有 dynamic tag。排查动态链接时，至少应关联检查下表的 tag 与
+重定位节：
+
+|Dynamic tag|关联内容|排查目的|
+|-|-|-|
+|`DT_RELA`、`DT_RELASZ`、`DT_RELAENT`|`.rela.dyn` 的地址、总大小和表项大小|确认动态加载器的常规重定位表|
+|`DT_JMPREL`、`DT_PLTRELSZ`、`DT_PLTREL`|PLT 重定位表（通常显示为 `.rela.plt`）|确认外部函数延迟/立即绑定入口|
+|`DT_PLTGOT`|GOT/PLT 所用的全局偏移表|关联 PLT 槽与 GOT 地址|
+|`DT_SYMTAB`、`DT_STRTAB`|动态符号表和字符串表|解析 relocation 中的符号索引|
+|`DT_NEEDED`、`DT_RUNPATH`|依赖库与搜索路径|解释符号最终从何处解析|
+
+下面是一个动态 PIE 的 `readelf` 实际输出格式（不同 binutils、链接顺序和 ASLR 前的
+链接地址会改变数值；应以本机构建的输出为准）：
+
+```
+$ readelf -dW app | rg 'NEEDED|RELA|JMPREL|PLTGOT'
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+ 0x0000000000000003 (PLTGOT)             0x0000000000020000
+ 0x0000000000000007 (RELA)               0x00000000000004b8
+ 0x0000000000000008 (RELASZ)             168 (bytes)
+ 0x0000000000000009 (RELAENT)            24 (bytes)
+ 0x0000000000000017 (JMPREL)             0x0000000000000560
+ 0x0000000000000002 (PLTRELSZ)           72 (bytes)
+ 0x0000000000000014 (PLTREL)             RELA
+
+$ readelf -rW app
+Relocation section '.rela.dyn' at offset 0x4b8 contains 7 entries:
+    Offset             Info             Type               Symbol's Value  Symbol's Name + Addend
+0000000000020020  0000000000000003 R_LARCH_RELATIVE                          0000000000000768
+0000000000020040  0006000000000002 R_LARCH_64           0000000000000000 __cxa_finalize + 0
+
+Relocation section '.rela.plt' at offset 0x560 contains 3 entries:
+    Offset             Info             Type               Symbol's Value  Symbol's Name + Addend
+0000000000020000  0007000000000005 R_LARCH_JUMP_SLOT    0000000000000000 __libc_start_main + 0
+```
+
+可用同一组命令检查自己的产物：
+
+```bash
+loongarch64-linux-gnu-readelf -dWrW app
+loongarch64-linux-gnu-objdump -drwC -j .plt -j .got -j .got.plt app
+```
+
+## GOT、PLT 与 TLS
+
+GOT 保存由动态加载器修复的地址或 TLS 访问所需的条目；PLT 是外部函数调用的跳板，
+其相应 GOT 槽经 `R_LARCH_JUMP_SLOT` 填充。位置无关代码访问全局数据时，静态链接器
+可在 `.text` 中留下 `R_LARCH_GOT_PC_HI20`/`R_LARCH_GOT_PC_LO12` 等重定位；调用外部
+函数则可见 `%plt(symbol)` 或动态表中的 `R_LARCH_JUMP_SLOT`。不要把“出现 GOT”简单
+等同于“必须通过 PLT 调用”：数据访问和函数调用的路径不同。
+
+TLS 模型同样应从重定位类型判断，而不是只看变量是否带 `__thread`：
+
+|模型|编译/静态链接时常见重定位|动态加载时可能看到的重定位|
+|-|-|-|
+|LE|`R_LARCH_TLS_LE_*`|通常无需动态 TLS 表项|
+|IE|`R_LARCH_TLS_IE_*`|`R_LARCH_TLS_TPREL32/64`|
+|GD/LD|`R_LARCH_TLS_GD_*`、`R_LARCH_TLS_LD_*`|`R_LARCH_TLS_DTPMOD32/64`、`R_LARCH_TLS_DTPREL32/64`|
+|TLS descriptor|`R_LARCH_TLS_DESC_*`|`R_LARCH_TLS_DESC32/64`|
+
+例如，`readelf -rW libtls.so` 中的以下两行表明动态 TLS-GD 表项（实际偏移、符号版本
+和 32/64 位后缀取决于目标 ABI）：
+
+```
+0000000000020030  0005000000000007 R_LARCH_TLS_DTPMOD64 0000000000000000 tls_counter + 0
+0000000000020038  0005000000000009 R_LARCH_TLS_DTPREL64 0000000000000000 tls_counter + 0
+```
+
+## 重定位溢出：诊断而非截断
+
+立即数字段和 PC 相对跳转都有可表示范围。链接器发现 `S + A - PC` 或其它计算结果
+超出该 relocation 的范围时必须报错，不能静默截断。例如 `R_LARCH_B26` 要求 28 位
+有符号、4 字节对齐的 PC 相对位移；medium 代码模型的 `R_LARCH_CALL36` 则要求 38 位
+有符号、4 字节对齐的范围，且 `pcaddu18i + jirl` 两条指令必须相邻。
+
+GNU ld 的实际错误文本会包含 relocation 名称和目标符号，典型形式如下：
+
+```
+ld: caller.o: relocation truncated to fit: R_LARCH_B26 against symbol `far_function'
+ld: caller.o: relocation truncated to fit: R_LARCH_CALL36 against symbol `far_function'
+```
+
+遇到此类错误时，先以 `readelf -rW` 和 `objdump -drwC` 定位产生 relocation 的指令，
+再检查链接脚本、代码模型（normal/medium/extreme）、`-fPIC` 与是否应经 GOT/PLT 间接
+访问。不要通过修改机器码立即数来“修复”溢出。
+
 
 ## 静态链接（static link）
 
@@ -383,6 +478,4 @@ Relocation section '.rela.plt' at offset 0x540 contains 3 entries:
 |GD | GOT-relative offset of the GOT entry of a TLS LD/GD/DESC symbol. If a symbol is <br> referenced by IE, GD/LD and DESC simultaneously, this symbol has five GOT entries.  <br> The first two are for GD/LD; the next two are for DESC; the last one is for IE.|
 |PLT| The address of PLT entry of a function symbol|
 |R(S) | The target (it may be a symbol, a GOT entry for a symbol) of an <br>R_LARCH_*_PCADD_HI20 relocation filling the immediate slot for a pcaddu12i <br>instruction at S|
-
-
 

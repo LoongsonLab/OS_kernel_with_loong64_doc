@@ -114,6 +114,10 @@ typedef struct {
 
 在龙架构中，值等于**EM_LOONGARCH**，十进制:258，十六进制:0x102
 
+`e_machine` 只标识 ISA 家族，不能单独确定对象之间能否链接；还必须检查
+`EI_CLASS` 和 `e_flags[7:0]`。例如 ELF64 与 ELF32、`lp64d` 与 `lp64s` 不应被
+当成同一调用 ABI。链接器对输入对象的 ABI 不匹配通常会报错，不能依赖运行时修复。
+
 4. e_version
 标志此文件的版本。支持两个： 
 - EV_NONE，0，表明是个无效的版本
@@ -177,6 +181,29 @@ typedef struct {
 **v1**我们称之为新世界的ABI，有时也称为ABI2.0。这两套ABI是不兼容的。
 :::
 
+## 对象 ABI 与浮点调用 ABI 的检查
+
+常用工具会把 `e_flags` 解码成便于阅读的文字。以 `ELF64 + lp64d + OBJ-v1` 为例，
+标志值为 `0x43`：低三位 `0x3` 是 DOUBLE-FLOAT（`lp64d`），位 `[7:6]` 的
+`0x40` 是 OBJ-v1；位 `[5:3]` 为零表示 `base` ABI extension。`OBJ-v1` 描述的是
+对象重定位语义版本，不能把它误称为“浮点 ABI”。
+
+建议同时检查头部和编译器实际选择的 ABI：
+
+```bash
+loongarch64-linux-gnu-gcc -Q --help=target | rg 'march|mabi'
+loongarch64-linux-gnu-readelf -hW hello | rg 'Class:|Machine:|Flags:'
+```
+
+预期的关键行（地址及其他行随文件变化）如下；若 `Flags` 与编译选项、sysroot 中的
+库 ABI 不一致，应停止链接并检查混入的对象文件：
+
+```
+  Class:                             ELF64
+  Machine:                           LoongArch
+  Flags:                             0x43, DOUBLE-FLOAT, OBJ-v1
+```
+
 
 9. 下面我们使用Linux的命令查看ELF的头表信息等。
 
@@ -219,10 +246,11 @@ ELF Header:
 - e_flags[5:3] = 3'b000，默认，无扩展；
 - e_flags[2:0] = 3'b011，ELFCLASS64，也就是使用lp64d ABI；
 
+这里的 `ELFCLASS64` 来自 `e_ident[EI_CLASS]`，并不位于 `e_flags[2:0]`；后者的
+`0x3` 是该 ELF64 对象的 DOUBLE-FLOAT（`lp64d`）Base ABI Modifier。
+
 
 
 
 [^ELF_CONTENTS]:https://www.sco.com/developers/gabi/latest/contents.html
 [^LoongArch_ABI2.5]:https://github.com/loongson/la-abi-specs
-
-

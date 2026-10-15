@@ -181,7 +181,10 @@ clean:
 	rm *.elf
 
 run:
-	qemu-system-loongarch64 -M virt -m 8G -kernel hello.elf -nographic -serial mon:stdio
+	qemu-system-loongarch64 -M virt -m 8G -kernel hello.elf -nographic -serial mon:stdio -pidfile qemu.pid
+
+debug:
+	qemu-system-loongarch64 -M virt -m 8G -kernel hello.elf -nographic -serial mon:stdio -S -gdb tcp:127.0.0.1:1234 -pidfile qemu.pid
 ```
 
 9, 执行一下命令，完成编译与运行
@@ -195,3 +198,14 @@ make run
 即可在终端中查看 QEMU 打印信息。
 
 用户可基于此框架，添加自定义用户程序，并在 QEMU 上运行测试。
+
+## 裸机调试会话的安全与清理
+
+`make debug` 启动的是无认证 GDB stub；仅绑定 `127.0.0.1`，并在另一终端用
+`loongarch64-unknown-linux-gnu-gdb hello.elf` 后执行 `target remote 127.0.0.1:1234`。
+不要使用 `-s` 或将 1234 端口暴露到局域网。`-S` 会让裸机程序在第一条指令前停止，需由
+GDB `continue` 开始运行。
+
+本示例的 `_exit` 是无限循环，程序不会自行退出。结束实验时在 `mon:stdio` 的 Monitor 中输入
+`quit`；随后确认 `qemu.pid` 指向的进程已结束，并按需要移除调试日志、临时 qcow2 overlay 与
+过期 PID 文件。不要把 `-d/-D` 产生的大型日志或含 guest 内存的信息直接提交到仓库。

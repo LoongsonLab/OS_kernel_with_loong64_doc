@@ -17,7 +17,7 @@
 
 ``` bash
 #	replace your real path with {/path/to/qemu}.
-{/path/to/qemu}/bin/qemu-system-loongarch64 -M virt -cpu la464 -m 4G -smp 1 -nographic -kernel ./vmlinux -serial mon:stdio -s -S 
+{/path/to/qemu}/bin/qemu-system-loongarch64 -M virt -cpu la464 -m 4G -smp 1 -nographic -kernel ./vmlinux -serial mon:stdio -S -gdb tcp:127.0.0.1:1234 -pidfile qemu.pid
 ```
 
 交叉编译器的 gdb 与 QEMU 连接， 使用以下命令:
@@ -25,7 +25,19 @@
 loongarch64-unknown-linux-gnu-gdb ./vmlinux
 ```
 
-gdb 内部命令，与原生 LoongArch 上 QEMU 连接 gdb 命令保持一致。
+GDB 内部命令，与原生 LoongArch 上 QEMU 连接 GDB 命令保持一致。连接时使用：
+
+```bash
+(gdb) target remote 127.0.0.1:1234
+```
+
+`target remote` 连接的是无认证的调试服务，能够读取和修改 guest 状态；只连接自己通过回环地址
+启动的 QEMU，不要把 GDB stub 或 Monitor 暴露给不可信网络。连接后 guest 仍因 `-S` 停止，使用
+`continue` 才会执行。
+
+退出 GDB 前，根据目的选择下列操作：若 QEMU 仍需运行，先执行 `detach`；若调试会话也应结束，
+在 QEMU Monitor 输入 `quit`，再退出 GDB。仅退出 GDB 不会终止 QEMU，也不会删除日志、PID 文件
+或临时 overlay。
 
 退出 gdb 模式，可在终端使用以下命令:
 ``` bash
@@ -60,7 +72,8 @@ For help, type "help".
 $ loongarch64-unknown-linux-gnu-gdb -q
 (gdb)
 ```
-同样，gdb 退出时，会有提示:
+连接远程 QEMU 时，GDB 的提示文本和本地 inferior 不同；不要把 “will be killed” 当作已经关闭
+QEMU 的证据。退出后应检查 `qemu.pid` 和监听端口，必要时在 Monitor 使用 `quit`：
 ``` bash
 A debugging session is active.
 Inferior 1 [process xxxxx] will be killed.
@@ -451,7 +464,6 @@ rbp at 0x7fffffffe580, rip at 0x7fffffffe588
 
 - 单步调试，在执行 ertn 等特权指令后，guest 程序会连续运行，调试失效。
 - 内存访问指令，在遇到页表切换会，容易失效。
-
 
 
 
